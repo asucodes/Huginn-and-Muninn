@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+
+# Node / extension
+node_modules/
+apps/extension/dist/
+apps/extension/out/
+*.vsix
+apps/extension/.vscode-test/
+
+# Taknee runtime state (never commit keys or per-workspace indexes)
+.taknee/
+*.db
+*.db-wal
+*.db-shm
+
+# OS / editors
+.DS_Store
+Thumbs.db
