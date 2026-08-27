@@ -1,6 +1,6 @@
 # Huginn & Muninn
 
-An agentic coding system for **small open-weight models (≤80B total parameters)**, built for the Takneek High-Prep problem statement. Named for Odin's two ravens: **Huginn** (thought) is the part that flies out and acts, running tasks autonomously; **Muninn** (memory) recalls context, spans, and session history across runs. The kernel was previously codenamed "Taknee"; the `taknee` package and CLI names are kept for compatibility. The editor host is [VSCodium](https://vscodium.com) (prebuilt Code-OSS, no Copilot, no telemetry); all agent behavior lives in this repo: a Python kernel plus a thin extension.
+An agentic coding system for **small open-weight models (≤80B total parameters)**. Named for Odin's two ravens: **Huginn** (thought) is the part that flies out and acts, running tasks autonomously; **Muninn** (memory) recalls context, spans, and session history across runs. The kernel was previously codenamed "Taknee"; the `taknee` package and CLI names are kept for compatibility. The editor host is [VSCodium](https://vscodium.com) (prebuilt Code-OSS, no Copilot, no telemetry); all agent behavior lives in this repo: a Python kernel plus a thin extension.
 
 **Plan of record:** [`docs/06-plan-of-record.md`](docs/06-plan-of-record.md) (decisions, architecture, build order, ownership). Everything else in `docs/` is research and trade-off evidence.
 
