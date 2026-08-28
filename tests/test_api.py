@@ -171,3 +171,35 @@ def test_task_api_exposes_display_prompt(tmp_path):
     tid = store.create_task("internal context", str(tmp_path), display_prompt="add exercises")
     assert c.get(f"/tasks/{tid}").json()["display_prompt"] == "add exercises"
     _reset()
+
+
+def test_radar_models_endpoint():
+    c = TestClient(api.app)
+    r = c.get("/radar/models")
+    assert r.status_code == 200
+    data = r.json()
+    assert "models" in data
+    assert data["count"] >= 4
+    model_ids = [m["id"] for m in data["models"]]
+    assert any("groq" in m["provider"] for m in data["models"])
+
+
+def test_radar_status_endpoint():
+    c = TestClient(api.app)
+    r = c.get("/radar/status")
+    assert r.status_code == 200
+    data = r.json()
+    assert "providers" in data
+    assert len(data["providers"]) >= 4
+    prov_names = {p["provider"] for p in data["providers"]}
+    assert "groq" in prov_names
+    assert "openrouter" in prov_names
+
+
+def test_radar_deals_endpoint():
+    c = TestClient(api.app)
+    r = c.get("/radar/deals")
+    assert r.status_code == 200
+    data = r.json()
+    assert "deals" in data
+

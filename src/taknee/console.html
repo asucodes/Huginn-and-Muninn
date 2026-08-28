@@ -229,6 +229,15 @@
   .tile .d.good { color: var(--ok); }
   .tile .d.warn { color: var(--warn); }
   .row2 { display: grid; grid-template-columns: 5fr 4fr; gap: 16px; margin-bottom: 22px; align-items: start; }
+  .grid-radar { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .radar-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .radar-card-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+  .radar-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+  .deal-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; transition: border-color .15s; }
+  .deal-card:hover { border-color: var(--accent); }
+  .deal-pill { font-size: 10px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--surface-3); color: var(--accent); font-weight: 600; text-transform: uppercase; }
+  .deal-credit { font-size: 10.5px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+  .swarm-hero { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 
   .table-wrap { overflow-x: auto; }
   table.tbl { width: 100%; border-collapse: collapse; }
@@ -743,6 +752,7 @@ const I = {
   sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/><path d="M19 15v4M17 17h4"/></svg>',
   alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  radar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="12" x2="20" y2="4"/></svg>',
 };
 
 /* ================================================================ toasts */
@@ -773,6 +783,7 @@ function cleanup() { pageTimers.forEach(clearInterval); pageTimers = []; }
 const NAV = [
   { hash: "#/overview", label: "Overview", icon: "home" },
   { hash: "#/tasks", label: "Tasks", icon: "list" },
+  { hash: "#/radar", label: "Compute Radar", icon: "radar" },
   { hash: "#/approvals", label: "Review", icon: "shield", badge: () => state.approvalsCount },
   { hash: "#/tools", label: "Tools", icon: "terminal" },
   { hash: "#/settings", label: "Settings", icon: "sliders" },
@@ -851,6 +862,13 @@ async function pageOverview() {
 
   c.innerHTML =
     '<div class="content-inner">' +
+    '<div class="swarm-hero">' +
+    '<div><div style="font-size:14px;font-weight:650;letter-spacing:-0.01em;display:flex;align-items:center;gap:8px">' +
+    '<span class="dot ok"></span> Swarm Mesh: Zero-Cost Compute Active</div>' +
+    '<div style="font-size:12px;color:var(--muted);margin-top:3px">Groq 500 t/s · OpenRouter Free Catalog · Gemini Flash 1M · Local Ollama · 0ms 429 Failover</div></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<a class="btn btn-ghost btn-sm" href="#/radar">' + I.radar + 'View Radar</a>' +
+    '<button class="btn btn-primary btn-sm" id="ov-run-btn">' + I.play + 'Run Task</button></div></div>' +
     '<div class="grid-tiles">' +
     tile("list", "Tasks", String(ts.length), running + " active now", running ? "good" : "") +
     tile("check", "Success rate", rate === null ? "·" : rate + "%", done + " done · " + failed + " failed", rate !== null && rate >= 80 ? "good" : rate !== null && rate < 50 ? "warn" : "") +
@@ -886,6 +904,8 @@ async function pageOverview() {
     kv("Catalog", h.catalog_compliant ? "compliant" : "non-compliant");
 
   $("#ov-refresh").onclick = () => { refreshHealth(); pageOverview(); };
+  const orb = $("#ov-run-btn");
+  if (orb) orb.onclick = openTaskModal;
   bindTaskRows(c);
 }
 
@@ -1778,6 +1798,169 @@ function openPalette() {
   paint();
 }
 
+/* ================================================================ radar */
+async function pageRadar() {
+  setPage("Compute Radar", "Zero-cost provider health, live free model catalog, and community deal stream");
+  const c = $("#content");
+  c.innerHTML =
+    '<div class="content-inner">' +
+    '<div class="swarm-hero" id="radar-hero"><div class="skeleton" style="width:50%;height:24px"></div></div>' +
+    '<div class="card" style="margin-bottom:24px">' +
+    '<div class="card-head"><h3>Provider Swarm Health</h3><div class="right"><button class="btn btn-ghost btn-sm" id="radar-refresh">' + I.refresh + "Refresh</button></div></div>' +
+    '<div class="card-body" id="radar-providers-wrap"><div class="grid-radar">' + Array(4).fill('<div class="radar-card"><div class="skeleton" style="width:70px"></div></div>').join("") + "</div></div></div>" +
+    '<div class="row2">' +
+    '<div class="card"><div class="card-head"><h3>Active Free-Tier Models</h3><div class="right"><div class="input-wrap" style="width:200px">' + I.search + '<input class="input" id="model-q" placeholder="Filter models…"></div></div></div>' +
+    '<div class="table-wrap" id="models-table-wrap"><div style="padding:30px"><div class="skeleton" style="width:40%;margin:0 auto"></div></div></div></div>' +
+    '<div class="card"><div class="card-head"><h3>Live Community Deals & API Drops</h3><div class="right"><button class="btn btn-ghost btn-sm" id="deals-scan-btn">' + I.refresh + "Scan Web</button></div></div>' +
+    '<div class="card-body" id="deals-list-wrap"><div class="skeleton" style="height:120px"></div></div></div>' +
+    "</div></div>";
+
+  let statusData = { providers: [] };
+  let modelsData = { models: [] };
+  let dealsData = { deals: [] };
+
+  async function loadAll() {
+    try {
+      const [st, md, dl] = await Promise.all([
+        api("/radar/status"),
+        api("/radar/models"),
+        api("/radar/deals"),
+      ]);
+      statusData = st;
+      modelsData = md;
+      dealsData = dl;
+    } catch (e) {
+      toast("Failed to load radar data: " + e.message, "bad");
+    }
+    paint();
+  }
+
+  function paint() {
+    // 1. Hero
+    const provs = statusData.providers || [];
+    const healthyCount = provs.filter((p) => p.healthy).length;
+    const totalModels = modelsData.count || (modelsData.models || []).length;
+    const heroEl = $("#radar-hero");
+    if (heroEl) {
+      heroEl.innerHTML =
+        '<div><div style="font-size:14.5px;font-weight:650;letter-spacing:-0.01em;display:flex;align-items:center;gap:8px">' +
+        '<span class="dot ok"></span> Swarm Mesh Active: ' + healthyCount + " / " + provs.length + " Providers Ready</div>" +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">' + totalModels + " verified zero-cost models indexed · Instant 0ms rate-limit failover · Total API Spend: $0.00</div></div>" +
+        '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-primary btn-sm" id="radar-new-task">' + I.play + 'Launch Task</button>' +
+        '<a class="btn btn-ghost btn-sm" href="#/settings">' + I.sliders + 'Configure Keys</a></div>';
+      const rnt = $("#radar-new-task");
+      if (rnt) rnt.onclick = openTaskModal;
+    }
+
+    // 2. Providers Grid
+    const pWrap = $("#radar-providers-wrap");
+    if (pWrap) {
+      if (!provs.length) {
+        pWrap.innerHTML = empty("cpu", "No providers reporting", "Check kernel connectivity");
+      } else {
+        pWrap.innerHTML =
+          '<div class="grid-radar">' +
+          provs.map((p) => {
+            const isOk = p.healthy;
+            const statusCls = isOk ? "ok" : "bad";
+            const statusTxt = isOk ? "Operational" : (p.active_rate_limit ? "429 Cooling (" + Math.round(p.cooldown_remaining_s) + "s)" : "Offline");
+            return (
+              '<div class="radar-card">' +
+              '<div class="radar-card-head">' +
+              '<span>' + esc(p.provider.toUpperCase()) + '</span>' +
+              '<span class="status-pill ' + statusCls + '"><span class="dot ' + statusCls + '"></span>' + statusTxt + '</span></div>' +
+              '<div class="radar-meta">' +
+              '<span>Free Models: <strong>' + p.free_models_count + '</strong></span>' +
+              '<span>Latency: <strong>' + Math.round(p.latency_ms) + 'ms</strong></span></div>' +
+              '<div style="font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:8px">' + esc(p.message || "") + '</div>' +
+              '</div>'
+            );
+          }).join("") +
+          "</div>";
+      }
+    }
+
+    // 3. Models Table
+    paintModels();
+
+    // 4. Deals List
+    const dWrap = $("#deals-list-wrap");
+    if (dWrap) {
+      const dList = dealsData.deals || [];
+      if (!dList.length) {
+        dWrap.innerHTML = empty("inbox", "No new promotional drops", "Check back soon or click Scan Web");
+      } else {
+        dWrap.innerHTML =
+          dList.slice(0, 10).map((d) => {
+            const provTag = d.provider_hint ? '<span class="deal-pill">' + esc(d.provider_hint) + '</span>' : '';
+            const credTag = d.credits_hint ? '<span class="deal-credit">' + esc(d.credits_hint) + '</span>' : '';
+            return (
+              '<div class="deal-card">' +
+              '<div style="min-width:0;flex:1">' +
+              '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+              '<a href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.title) + '</a></div>' +
+              '<div style="font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px">' +
+              '<span>' + esc(d.source) + '</span>' +
+              (provTag ? '<span>·</span>' + provTag : '') +
+              (credTag ? '<span>·</span>' + credTag : '') +
+              '</div></div>' +
+              '<a class="btn btn-ghost btn-sm" href="' + esc(d.url) + '" target="_blank" rel="noopener">Open</a>' +
+              '</div>'
+            );
+          }).join("");
+      }
+    }
+  }
+
+  function paintModels() {
+    const q = ($("#model-q") ? $("#model-q").value : "").trim().toLowerCase();
+    const all = modelsData.models || [];
+    const filtered = all.filter((m) => !q || m.id.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q) || (m.name || "").toLowerCase().includes(q));
+    const wrap = $("#models-table-wrap");
+    if (!wrap) return;
+    if (!filtered.length) {
+      wrap.innerHTML = empty("search", "No models match query", "");
+      return;
+    }
+    wrap.innerHTML =
+      '<table class="tbl"><thead><tr><th>Model</th><th>Provider</th><th class="th-num">Context</th><th class="th-num">Speed</th></tr></thead><tbody>' +
+      filtered.map((m) => {
+        const ctxK = Math.round(m.context_window / 1024) + "k";
+        const spd = Math.round(m.speed_tps) + " t/s";
+        return (
+          '<tr>' +
+          '<td><div style="font-weight:600;font-size:13px">' + esc(m.name || m.id) + '</div><div class="mono" style="font-size:11px;color:var(--faint)">' + esc(m.id) + '</div></td>' +
+          '<td><span class="deal-pill">' + esc(m.provider) + '</span></td>' +
+          '<td class="num mono">' + ctxK + '</td>' +
+          '<td class="num mono">' + spd + '</td>' +
+          '</tr>'
+        );
+      }).join("") +
+      "</tbody></table>";
+  }
+
+  const rRef = $("#radar-refresh");
+  if (rRef) rRef.onclick = () => loadAll();
+
+  const dScan = $("#deals-scan-btn");
+  if (dScan) dScan.onclick = async () => {
+    toast("Scanning Reddit, Hacker News, and OpenRouter feeds…", "ok");
+    try {
+      dealsData = await api("/radar/deals?refresh=true");
+      paint();
+      toast("Scan complete. Found " + (dealsData.count || 0) + " community deals.", "ok");
+    } catch (e) {
+      toast("Scan error: " + e.message, "bad");
+    }
+  };
+
+  const mq = $("#model-q");
+  if (mq) mq.oninput = () => paintModels();
+
+  await loadAll();
+}
+
 /* ================================================================ router */
 function route() {
   cleanup();
@@ -1788,6 +1971,7 @@ function route() {
   document.body.classList.toggle("chat-route", isChat);
   if (parts[0] === "tasks" && parts[1]) pageTaskDetail(decodeURIComponent(parts[1]));
   else if (parts[0] === "tasks") pageTasks();
+  else if (parts[0] === "radar") pageRadar();
   else if (parts[0] === "approvals") pageApprovals();
   else if (parts[0] === "tools") pageTools();
   else if (parts[0] === "settings") pageSettings();
