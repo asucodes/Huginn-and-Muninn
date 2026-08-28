@@ -1,4 +1,4 @@
-﻿"""Autonomous Milestone Graph — the V2 agent execution engine.
+"""Autonomous Milestone Graph — the V2 agent execution engine.
 
 Replaces the rigid linear orchestrator.py pipeline with a 3-milestone
 event-driven ReAct loop inside a sandboxed Git worktree.
@@ -12,10 +12,14 @@ The core user-visible improvements over V1 orchestrator.py:
   1. Agent can READ multiple files, explore callers, and search code before patching.
   2. Agent runs tests automatically in an isolated Git worktree; retries on failure.
   3. User sees a clean unified diff and approves before any change hits their workspace.
+  4. Agent can fetch live web URLs and write arbitrary files to the workspace directly.
 """
 from __future__ import annotations
 
 import json
+import os
+import urllib.request
+import urllib.error
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,13 +32,33 @@ from ..swarm.cache_optimizer import PromptCachePacker
 from ..swarm.rotator import SwarmRotator
 from ..transport.client import chat_with_swarm
 
+# Maximum bytes to return from web_fetch (prevents huge pages blowing context)
+WEB_FETCH_MAX = 40_000
+
 MAX_STEPS = 25  # Hard cap per OpenAI Harness / mini-SWE-agent best practice
 SYSTEM_PROMPT = """\
-You are Huginn, an autonomous coding agent.
-You operate inside an isolated Git worktree — you cannot corrupt the user's workspace.
-Think step-by-step. Use tools to explore code before patching.
-Prefer minimal, precise changes. Always run the test command to verify your work.
-When your task is done and tests pass, call submit_task with a concise summary.\
+You are Huginn, an autonomous agent capable of both coding tasks and live data research.
+
+## Core rules
+- Think step-by-step before acting. Use tools to gather facts; never invent data.
+- You operate inside an isolated Git worktree — you cannot corrupt the user's workspace.
+- Prefer minimal, precise changes. Always verify your work before submitting.
+
+## Tool usage
+- To read a URL or API (live web data, JSON APIs, documentation): use `web_fetch`.
+- To write a brand-new file: use `create_file`.
+- To modify an existing file: use `write_patch`.
+- To explore directory structure: use `list_dir`.
+- To read an existing file: use `read_file`.
+- To search for code patterns: use `search_code`.
+- When your task is done, call `submit_task` with a concise summary.
+
+## When the task involves fetching live data and writing a file
+1. Call `web_fetch` with the target URL.
+2. Parse the response to extract only the required facts.
+3. Call `create_file` to write the output file with accurate, sourced content.
+4. Call `submit_task`.
+Never skip web_fetch and write made-up data. If a URL fails, try an alternative URL.\
 """
 
 
@@ -69,6 +93,16 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "list_dir",
+            "description": "List files and directories at a given path inside the workspace.",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string", "description": "Relative path to list (default '.' for root)."},
+            }, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_code",
             "description": "Search for a pattern (ripgrep or grep) across the workspace. Returns matching lines.",
             "parameters": {"type": "object", "properties": {
@@ -80,8 +114,28 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "web_fetch",
+            "description": (
+                "Fetch the content of any public URL (HTTP/HTTPS). "
+                "Use this to retrieve live web pages, JSON APIs, RSS feeds, documentation, etc. "
+                "Returns the response body as text (truncated to 40 000 chars). "
+                "Always use this tool when the task requires live data from the internet."
+            ),
+            "parameters": {"type": "object", "properties": {
+                "url": {"type": "string", "description": "Full URL to fetch, including https://."},
+                "headers": {
+                    "type": "object",
+                    "description": "Optional extra HTTP headers as key-value pairs.",
+                    "additionalProperties": {"type": "string"},
+                },
+            }, "required": ["url"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "write_patch",
-            "description": "Apply SEARCH/REPLACE edits to one or more files.",
+            "description": "Apply SEARCH/REPLACE edits to one or more existing files.",
             "parameters": {"type": "object", "properties": {
                 "hunks": {"type": "array", "items": {"type": "object", "properties": {
                     "path": {"type": "string"},
@@ -89,6 +143,21 @@ TOOL_SCHEMAS = [
                     "replace": {"type": "string"},
                 }, "required": ["path", "search", "replace"]}},
             }, "required": ["hunks"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_file",
+            "description": (
+                "Create a new file (or overwrite an existing one) with the given content. "
+                "Use this when you need to write a brand-new file rather than patch an existing one. "
+                "The path is relative to the workspace root."
+            ),
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string", "description": "Relative path for the new file."},
+                "content": {"type": "string", "description": "Full text content to write."},
+            }, "required": ["path", "content"]},
         },
     },
     {
@@ -274,10 +343,83 @@ class MilestoneGraph:
                     results.append(f"ERROR on {path}: {e}")
             return "\n".join(results)
 
+        if name == "create_file":
+            # Writes a new file into the sandbox worktree AND commits an identical
+            # copy at the workspace root so the file persists after approval.
+            path = args.get("path", "")
+            content = args.get("content", "")
+            if not path:
+                return "ERROR: 'path' is required"
+            try:
+                sandbox.write_file(path, content)
+                # Also write to real workspace so the file is immediately visible
+                real_path = self.workspace / path
+                real_path.parent.mkdir(parents=True, exist_ok=True)
+                real_path.write_text(content, encoding="utf-8")
+                return f"OK: wrote {len(content)} chars to {path}"
+            except Exception as e:
+                return f"ERROR: {e}"
+
+        if name == "list_dir":
+            path = args.get("path", ".")
+            try:
+                target = (self.workspace / path).resolve()
+                entries = sorted(target.iterdir(), key=lambda p: (p.is_file(), p.name))
+                lines = []
+                for entry in entries:
+                    kind = "FILE" if entry.is_file() else "DIR "
+                    size = f"{entry.stat().st_size:>10,} B" if entry.is_file() else ""
+                    lines.append(f"{kind}  {entry.name}  {size}")
+                return "\n".join(lines) or "(empty directory)"
+            except Exception as e:
+                return f"ERROR: {e}"
+
+        if name == "web_fetch":
+            url = args.get("url", "")
+            if not url:
+                return "ERROR: 'url' is required"
+            extra_headers = args.get("headers", {}) or {}
+            try:
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        # Polite browser-like UA so servers don't block us
+                        "User-Agent": "Huginn-Agent/2.0 (+https://github.com/asucodes/Huginn-and-Muninn)",
+                        "Accept": "text/html,application/json,application/xhtml+xml,*/*;q=0.8",
+                        **extra_headers,
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read(WEB_FETCH_MAX)
+                    # Detect encoding from Content-Type header; fall back to utf-8
+                    ct = resp.headers.get("Content-Type", "")
+                    charset = "utf-8"
+                    if "charset=" in ct:
+                        charset = ct.split("charset=")[-1].split(";")[0].strip()
+                    text = raw.decode(charset, errors="replace")
+                    status = resp.status
+                return f"HTTP {status} — {url}\n\n{text[:WEB_FETCH_MAX]}"
+            except urllib.error.HTTPError as e:
+                return f"HTTP ERROR {e.code}: {e.reason} — {url}"
+            except urllib.error.URLError as e:
+                return f"URL ERROR: {e.reason} — {url}"
+            except Exception as e:
+                return f"ERROR fetching {url}: {e}"
+
         if name == "run_tests":
             cmd = args.get("cmd", test_cmd)
             exit_code, output = sandbox.run(cmd, timeout=120.0)
             status = "PASS" if exit_code == 0 else "FAIL"
             return f"[{status}] exit={exit_code}\n{output}"
+
+        if name == "search_code":
+            pattern = args.get("pattern", "")
+            path = args.get("path", ".")
+            # Use git grep inside worktree (faster, respects .gitignore)
+            exit_code, output = sandbox.run(f"git grep -n -- {json.dumps(pattern)} -- {path}")
+            if exit_code != 0:
+                # Fall back to grep if not a git repo or pattern not found
+                _, output = sandbox.run(f"grep -rn -- {json.dumps(pattern)} {path}")
+            return output[:8000] or "(no matches)"
 
         return f"Unknown tool: {name}"

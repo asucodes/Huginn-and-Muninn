@@ -96,6 +96,7 @@ class ToolCallIn(BaseModel):
 # -- lifecycle ---------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/console", response_class=HTMLResponse)
 def console() -> HTMLResponse:
     """Local test UI — the kernel is otherwise JSON-only."""
     path = Path(__file__).with_name("console.html")

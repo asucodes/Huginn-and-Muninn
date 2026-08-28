@@ -445,7 +445,9 @@ class Orchestrator:
             ],
             iteration=iteration,
         )
-        blocks = patches.parse(result.content)
+        wanted = research.requested_files(prompt) if self._research else []
+        default_file = wanted[0] if wanted else None
+        blocks = patches.parse(result.content, default_file=default_file)
         fp = patches.hash_text(result.content)
         self._fingerprints[f"patch:{fp}"] += 1
         if self._fingerprints[f"patch:{fp}"] >= self._caps().get("fingerprint_limit", 3):

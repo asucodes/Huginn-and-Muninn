@@ -134,3 +134,41 @@ def test_diff_report():
     report = patches.ApplyReport()
     d = report.diff(files, originals)
     assert "+two" in d
+
+
+def test_parse_relaxed_search_replace():
+    text = """Here is the change:
+<<<<<<< SEARCH
+old line
+=======
+new line
+>>>>>>> REPLACE
+"""
+    blocks = patches.parse(text, default_file="config.py")
+    assert len(blocks) == 1
+    assert blocks[0].file == "config.py"
+    assert blocks[0].search == "old line"
+    assert blocks[0].replace == "new line"
+
+
+def test_parse_code_fence_with_filename():
+    text = """```./kernel_org_brief.md
+# kernel.org snapshot
+- Latest stable: 7.2.1
+```"""
+    blocks = patches.parse(text)
+    assert len(blocks) == 1
+    assert blocks[0].file == "./kernel_org_brief.md"
+    assert "# kernel.org snapshot" in blocks[0].replace
+
+
+def test_parse_fallback_default_file_for_raw_markdown():
+    text = """# kernel.org snapshot
+- Retrieval date: 2026-08-28
+- Fetched URLs: https://www.kernel.org/
+- Latest stable: 7.2.1
+"""
+    blocks = patches.parse(text, default_file="kernel_org_brief.md")
+    assert len(blocks) == 1
+    assert blocks[0].file == "kernel_org_brief.md"
+    assert "Latest stable: 7.2.1" in blocks[0].replace

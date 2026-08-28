@@ -231,10 +231,21 @@ def _score_in_evidence(token: str, evidence: str) -> bool:
     return False
 
 
+def _norm_url(u: str) -> str:
+    u = u.strip().rstrip("/")
+    u = re.sub(r"^https?://", "", u)
+    u = re.sub(r"^www\.", "", u)
+    return u
+
+
 def _url_was_fetched(url: str, fetched_urls: list[str]) -> bool:
     if url in fetched_urls:
         return True
-    return any(url.startswith(f.rstrip("/") ) or f.startswith(url.rstrip("/")) for f in fetched_urls)
+    norm_url = _norm_url(url)
+    norm_fetched = [_norm_url(f) for f in fetched_urls]
+    if norm_url in norm_fetched:
+        return True
+    return any(norm_url.startswith(f) or f.startswith(norm_url) for f in norm_fetched if f)
 
 
 def grade_research_write(

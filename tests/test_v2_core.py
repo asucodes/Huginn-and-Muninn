@@ -159,3 +159,53 @@ class TestChangelogTracker:
         # Second scan: no new models (same catalog)
         deltas2 = tracker.detect_new_models()
         assert len(deltas2) == 0  # Nothing new appeared
+
+
+# ── Milestone Graph Tool Dispatch ───────────────────────────────────────────
+
+class TestMilestoneGraphTools:
+    def test_tool_dispatch_create_file(self, tmp_path):
+        from taknee.engine.graph import MilestoneGraph
+        from taknee.engine.sandbox import GitWorktreeSandbox
+
+        g = MilestoneGraph.__new__(MilestoneGraph)
+        g.workspace = tmp_path
+
+        mock_sandbox = MagicMock(spec=GitWorktreeSandbox)
+        res = g._dispatch_tool("create_file", {"path": "brief.md", "content": "# Hello"}, mock_sandbox, "pytest")
+        assert "OK: wrote 7 chars to brief.md" in res
+        assert (tmp_path / "brief.md").read_text(encoding="utf-8") == "# Hello"
+
+    def test_tool_dispatch_list_dir(self, tmp_path):
+        from taknee.engine.graph import MilestoneGraph
+        from taknee.engine.sandbox import GitWorktreeSandbox
+
+        (tmp_path / "a.txt").write_text("aaa")
+        (tmp_path / "sub").mkdir()
+
+        g = MilestoneGraph.__new__(MilestoneGraph)
+        g.workspace = tmp_path
+
+        mock_sandbox = MagicMock(spec=GitWorktreeSandbox)
+        res = g._dispatch_tool("list_dir", {"path": "."}, mock_sandbox, "pytest")
+        assert "FILE  a.txt" in res
+        assert "DIR   sub" in res
+
+    def test_tool_dispatch_web_fetch(self, tmp_path):
+        from taknee.engine.graph import MilestoneGraph
+        from taknee.engine.sandbox import GitWorktreeSandbox
+
+        g = MilestoneGraph.__new__(MilestoneGraph)
+        g.workspace = tmp_path
+
+        mock_sandbox = MagicMock(spec=GitWorktreeSandbox)
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = b'{"status": "ok"}'
+            mock_resp.status = 200
+            mock_resp.headers = {"Content-Type": "application/json"}
+            mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+            res = g._dispatch_tool("web_fetch", {"url": "https://example.com/api"}, mock_sandbox, "pytest")
+            assert "HTTP 200" in res
+            assert '{"status": "ok"}' in res

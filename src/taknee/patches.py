@@ -65,18 +65,99 @@ class ApplyReport:
         return "".join(out)
 
 
-def parse(text: str) -> list[PatchBlock]:
+RELAXED_BLOCK_RE = re.compile(
+    r"(?:```+[^\r\n`]*\r?\n)?"
+    r"(?:(?:File|Path|Filename)?:\s*(?P<named_path>[^\r\n`<]+)\r?\n)?"
+    r"(?:(?P<body_path>[^\r\n`<]+)\r?\n)?"
+    r"<{3,}\s*SEARCH\r?\n(?P<search>.*?)(?:\r?\n)?={3,}\r?\n"
+    r"(?P<replace>.*?)\r?\n>{3,}\s*REPLACE",
+    re.DOTALL | re.IGNORECASE,
+)
+
+_FILE_EXTENSIONS = (
+    ".py", ".md", ".txt", ".js", ".ts", ".jsx", ".tsx", ".html", ".css",
+    ".json", ".yaml", ".yml", ".toml", ".sh", ".bash", ".sql", ".rs", ".go",
+)
+
+
+def _is_valid_path(p: str) -> bool:
+    if not p:
+        return False
+    p = p.strip()
+    if p.endswith(":") or p.endswith("?") or p.endswith("!"):
+        return False
+    if " " in p:
+        return False
+    if any(p.endswith(ext) for ext in _FILE_EXTENSIONS) or "/" in p or "\\" in p:
+        return True
+    return False
+
+
+def parse(text: str, default_file: str | None = None) -> list[PatchBlock]:
+    """Parse SEARCH/REPLACE blocks with strict, relaxed, and fallback heuristics."""
+    if not text or not text.strip():
+        return []
+
     blocks: list[PatchBlock] = []
+    # 1. Strict aider-style block format
     for m in BLOCK_RE.finditer(text):
         header = m.group("header").strip()
         body_path = (m.group("body_path") or "").strip()
-        # A language-tagged fence needs its path on the next line.  Without a
-        # path it is almost certainly prose, not a patch for a file called
-        # "python" or "json".
         path = body_path or header
         if not path or (header.lower() in _FENCE_LANGUAGES and not body_path):
             continue
         blocks.append(PatchBlock(path, m.group("search"), m.group("replace")))
+    if blocks:
+        return blocks
+
+    # 2. Relaxed SEARCH/REPLACE format
+    for m in RELAXED_BLOCK_RE.finditer(text):
+        named = (m.group("named_path") or "").strip()
+        body = (m.group("body_path") or "").strip()
+        path = ""
+        if _is_valid_path(named):
+            path = named
+        elif _is_valid_path(body):
+            path = body
+        else:
+            path = default_file or ""
+        if path.lower() in _FENCE_LANGUAGES:
+            path = default_file or ""
+        if path:
+            blocks.append(PatchBlock(path, m.group("search"), m.group("replace")))
+    if blocks:
+        return blocks
+
+    # 3. Code fence with path header (e.g. ```./kernel_org_brief.md\n...\n```)
+    fence_matches = list(re.finditer(r"```+([^\r\n`]*)\r?\n(.*?)```+", text, re.DOTALL))
+    for fm in fence_matches:
+        hdr = fm.group(1).strip()
+        body = fm.group(2)
+        # Check if header contains a recognizable filename
+        target_path = None
+        for token in hdr.split():
+            clean_tok = token.strip("./\\\"'")
+            if any(token.endswith(ext) for ext in _FILE_EXTENSIONS) or "/" in token or "\\" in token:
+                target_path = token
+                break
+        if not target_path and default_file:
+            target_path = default_file
+        if target_path and target_path.lower() not in _FENCE_LANGUAGES:
+            blocks.append(PatchBlock(target_path, "", body if body.endswith("\n") else body + "\n"))
+    if blocks:
+        return blocks
+
+    # 4. Fallback for single requested file when output is raw content or single markdown block
+    if default_file:
+        content = text.strip()
+        # If wrapped in single outer code fence, unwrap it
+        if content.startswith("```") and content.endswith("```"):
+            lines = content.splitlines()
+            if len(lines) >= 2:
+                content = "\n".join(lines[1:-1]).strip()
+        if content:
+            blocks.append(PatchBlock(default_file, "", content + "\n"))
+
     return blocks
 
 
