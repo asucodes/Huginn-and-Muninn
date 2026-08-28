@@ -158,16 +158,22 @@ FREE_PROVIDERS = ("ollama", "groq", "openrouter", "nim")
 PAYG_PROVIDERS = ("mistral", "cerebras", "deepinfra", "fireworks", "together")
 
 
+import fnmatch
+
+
 def entry(model_id: str) -> ModelEntry | None:
     return MODELS.get(model_id)
 
 
-def is_allowed(model_id: str) -> tuple[bool, str]:
-    """Returns (allowed, reason). A model must be listed and within the cap."""
-    if model_id in BANNED:
-        return False, f"banned: {BANNED[model_id]}"
+def is_allowed(model_id: str, allow_custom: bool = False) -> tuple[bool, str]:
+    """Returns (allowed, reason). A model must not be banned and within limits."""
+    for pat, reason in BANNED.items():
+        if fnmatch.fnmatch(model_id, pat) or model_id == pat:
+            return False, f"banned: {reason}"
     m = MODELS.get(model_id)
     if m is None:
+        if allow_custom:
+            return True, "ok"
         return False, "not in catalog — add with published total params first"
     if m.total_params > MAX_TOTAL_PARAMS:
         return False, f"{m.total_params/1e9:.1f}B total > 80B cap"

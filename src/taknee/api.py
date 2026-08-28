@@ -96,6 +96,7 @@ class SettingsIn(BaseModel):
 
 class KeyIn(BaseModel):
     key: str = ""
+    model: str | None = None
 
 
 class TaskIn(BaseModel):
@@ -191,14 +192,29 @@ def update_settings(body: SettingsIn) -> dict:
     return settings_mod.masked(data)
 
 
+@app.get("/settings/providers/{name}/models")
+def get_provider_models(name: str) -> dict:
+    if name not in settings_mod.PROVIDERS and name != "ollama":
+        raise HTTPException(404, f"unknown provider {name}")
+    models = providers.fetch_live_models(name)
+    current_model = settings_mod.get_provider_model(name)
+    return {"provider": name, "models": models, "current_model": current_model}
+
+
 @app.post("/settings/providers/{name}/key")
-def set_key(name: str, body: KeyIn) -> dict:
+@app.post("/settings/providers/{name}/config")
+def set_provider_config_endpoint(name: str, body: KeyIn) -> dict:
     try:
-        settings_mod.set_provider_key(name, body.key)
+        settings_mod.set_provider_config(
+            name,
+            key=body.key if body.key else None,
+            model=body.model if body.model is not None else None,
+        )
     except ValueError as e:
         raise HTTPException(400, str(e))
     stored = settings_mod.has_key(name)
-    return {"provider": name, "key": "set" if stored else "", "saved": stored}
+    current_model = settings_mod.get_provider_model(name)
+    return {"provider": name, "key": "set" if stored else "", "saved": stored, "model": current_model}
 
 
 @app.post("/settings/providers/{name}/test")
@@ -226,6 +242,8 @@ def test_provider(name: str, body: KeyIn = KeyIn()) -> dict:
                 ),
             }
         settings_mod.set_provider_key(name, cleaned)
+    if body.model is not None:
+        settings_mod.set_provider_config(name, model=body.model)
     ok, msg = providers.test_key(name)
     return {
         "provider": name,
@@ -233,6 +251,7 @@ def test_provider(name: str, body: KeyIn = KeyIn()) -> dict:
         "pinged": not msg.startswith("Did not ping"),
         "saved": settings_mod.has_key(name),
         "message": msg,
+        "model": settings_mod.get_provider_model(name),
     }
 
 

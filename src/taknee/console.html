@@ -1684,16 +1684,21 @@ async function pageSettings() {
     '<button class="btn btn-primary" id="ws-save" style="flex-shrink:0">Set workspace</button></div>' +
     '<p style="font-size:12px;color:var(--faint);margin-top:8px">The folder the agent reads and edits. Changing it points the kernel at a different project.</p></div></div>' +
 
-    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>API keys</h3><div class="right"><span style="font-size:11.5px;color:var(--faint)">keys are stored kernel-side and never echoed back</span></div></div>' +
+    '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>API keys &amp; Model Selection</h3><div class="right"><span style="font-size:11.5px;color:var(--faint)">keys stored kernel-side · custom model overrides supported</span></div></div>' +
     '<div class="card-body"><div class="provider-grid">' +
     providers.map((p) => {
       const set = !!(s.providers[p] && s.providers[p].key);
+      const curModel = (s.providers[p] && s.providers[p].model) || "";
       return '<div class="card provider-card">' +
         '<div class="pname"><span class="keydot ' + (set ? "set" : "unset") + '"></span>' + PROVIDER_LABELS[p] +
         (set ? '<span style="font-size:11px;color:var(--ok);font-weight:600">key set</span>' : '<span style="font-size:11px;color:var(--faint)">no key</span>') + "</div>" +
         '<div class="prow"><input class="input mono" type="password" id="key-' + p + '" placeholder="paste API key" autocomplete="off">' +
         '<button class="btn btn-ghost btn-sm" data-save="' + p + '">Save</button>' +
         '<button class="btn btn-ghost btn-sm" data-test="' + p + '">Test</button></div>' +
+        '<div style="display:flex;gap:6px;margin-top:6px">' +
+        '<input class="input mono" style="font-size:11.5px;padding:5px 8px;flex:1" id="model-' + p + '" list="list-' + p + '" placeholder="Custom Model ID (e.g. openai/gpt-oss-20b)" value="' + esc(curModel) + '">' +
+        '<datalist id="list-' + p + '"></datalist>' +
+        '<button class="btn btn-ghost btn-sm" data-fetch-models="' + p + '" title="Fetch live models from provider">Models</button></div>' +
         '<div class="pmsg" id="msg-' + p + '"></div></div>';
     }).join("") + "</div></div></div>" +
 
@@ -1723,26 +1728,54 @@ async function pageSettings() {
     } catch (e) { toast(e.message, "bad"); }
   };
 
+  async function loadModelsFor(p) {
+    try {
+      const data = await api("/settings/providers/" + p + "/models");
+      const dl = $("#list-" + p);
+      if (dl && data.models) {
+        dl.innerHTML = data.models.map((m) => '<option value="' + esc(m) + '">').join("");
+      }
+      return data.models || [];
+    } catch { return []; }
+  }
+
+  providers.forEach((p) => {
+    if (s.providers[p]?.key) loadModelsFor(p);
+  });
+
+  c.querySelectorAll("button[data-fetch-models]").forEach((b) => {
+    b.onclick = async () => {
+      const p = b.dataset.fetchModels;
+      b.textContent = "Loading…";
+      const models = await loadModelsFor(p);
+      b.textContent = "Models (" + models.length + ")";
+      if (models.length) toast("Loaded " + models.length + " live models for " + PROVIDER_LABELS[p], "ok");
+      else toast("No models discovered or provider offline", "bad");
+    };
+  });
+
   c.querySelectorAll("button[data-save]").forEach((b) => {
     b.onclick = async () => {
       const p = b.dataset.save;
       const key = $("#key-" + p).value;
-      if (!key.trim()) { toast("Paste a key first", "bad"); return; }
+      const model = ($("#model-" + p).value || "").trim();
       try {
-        const r = await post("/settings/providers/" + p + "/key", { key });
+        const r = await post("/settings/providers/" + p + "/config", { key: key || undefined, model });
         $("#msg-" + p).className = "pmsg " + (r.saved ? "ok" : "bad");
-        $("#msg-" + p).textContent = r.saved ? "Key saved." : "Key not saved.";
-        $("#key-" + p).value = "";
+        $("#msg-" + p).textContent = r.saved ? (model ? "Saved key & model (" + model + ")." : "Key saved.") : "Saved model (" + model + ").";
+        if (key) $("#key-" + p).value = "";
+        loadModelsFor(p);
       } catch (e) { $("#msg-" + p).className = "pmsg bad"; $("#msg-" + p).textContent = e.message; }
     };
   });
   c.querySelectorAll("button[data-test]").forEach((b) => {
     b.onclick = async () => {
       const p = b.dataset.test;
+      const model = ($("#model-" + p).value || "").trim();
       const msg = $("#msg-" + p);
-      msg.className = "pmsg"; msg.textContent = "Pinging " + PROVIDER_LABELS[p] + "…";
+      msg.className = "pmsg"; msg.textContent = "Pinging " + PROVIDER_LABELS[p] + (model ? " [" + model + "]" : "") + "…";
       try {
-        const r = await post("/settings/providers/" + p + "/test", { key: $("#key-" + p).value });
+        const r = await post("/settings/providers/" + p + "/test", { key: $("#key-" + p).value, model: model || undefined });
         msg.className = "pmsg " + (r.ok ? "ok" : "bad");
         msg.textContent = r.message;
       } catch (e) { msg.className = "pmsg bad"; msg.textContent = e.message; }

@@ -58,7 +58,7 @@ def normalize_provider_key(provider: str, raw: str) -> str:
     return line
 
 DEFAULTS: dict[str, Any] = {
-    "providers": {p: {"key": ""} for p in PROVIDERS},
+    "providers": {p: {"key": "", "model": ""} for p in PROVIDERS},
     "ollama_base_url": "http://127.0.0.1:11434/v1",
     "allow_paid": False,  # PAYG providers only used when explicitly enabled
     "prefer_local": False,
@@ -99,9 +99,32 @@ def set_provider_key(provider: str, key: str, path: Path | None = None) -> dict[
     if provider not in PROVIDERS:
         raise ValueError(f"unknown provider: {provider}")
     data = load(path)
-    data["providers"][provider]["key"] = normalize_provider_key(provider, key)
+    data["providers"].setdefault(provider, {})["key"] = normalize_provider_key(provider, key)
     save(data, path)
     return data
+
+
+def set_provider_config(
+    provider: str,
+    key: str | None = None,
+    model: str | None = None,
+    path: Path | None = None,
+) -> dict[str, Any]:
+    if provider not in PROVIDERS and provider != "ollama":
+        raise ValueError(f"unknown provider: {provider}")
+    data = load(path)
+    entry = data.setdefault("providers", {}).setdefault(provider, {})
+    if key is not None:
+        entry["key"] = normalize_provider_key(provider, key)
+    if model is not None:
+        entry["model"] = model.strip()
+    save(data, path)
+    return data
+
+
+def get_provider_model(provider: str, data: dict[str, Any] | None = None) -> str:
+    data = data if data is not None else load()
+    return (data.get("providers", {}).get(provider, {}).get("model") or "").strip()
 
 
 def get_key(provider: str, data: dict[str, Any] | None = None) -> str:

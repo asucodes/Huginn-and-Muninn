@@ -132,7 +132,7 @@ def chat(
     transport: str = "auto",
 ) -> ChatResult:
     """One chat completion. Raises ProviderError/RateLimited; never retries."""
-    allowed, reason = catalog.is_allowed(model)
+    allowed, reason = catalog.is_allowed(model, allow_custom=True)
     if not allowed:
         raise ProviderError(provider, 0, f"model refused by catalog: {reason}")
 
@@ -156,10 +156,67 @@ def chat(
     )
 
 
+def fetch_live_models(
+    provider: str,
+    settings: dict[str, Any] | None = None,
+    key: str | None = None,
+    timeout: float = 8.0,
+) -> list[str]:
+    """Dynamically queries the provider's live endpoint for all available models."""
+    cfg = settings if settings is not None else settings_mod.load()
+    api_key = key or settings_mod.get_key(provider, cfg)
+
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key and provider != "ollama" else {}
+    headers.update(EXTRA_HEADERS.get(provider, {}))
+
+    try:
+        if provider == "groq":
+            url = "https://api.groq.com/openai/v1/models"
+        elif provider == "openrouter":
+            url = "https://openrouter.ai/api/v1/models"
+        elif provider == "nim":
+            url = "https://integrate.api.nvidia.com/v1/models"
+        elif provider == "mistral":
+            url = "https://api.mistral.ai/v1/models"
+        elif provider == "cerebras":
+            url = "https://api.cerebras.ai/v1/models"
+        elif provider == "together":
+            url = "https://api.together.xyz/v1/models"
+        elif provider == "deepinfra":
+            url = "https://api.deepinfra.com/v1/models"
+        elif provider == "ollama":
+            base = cfg.get("ollama_base_url", "http://127.0.0.1:11434/v1").rstrip("/v1")
+            url = f"{base}/api/tags"
+        else:
+            return [m.id for m in catalog.models_for(provider)]
+
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return [m.id for m in catalog.models_for(provider)]
+            data = resp.json()
+            if provider == "ollama":
+                models = [m.get("name") for m in data.get("models", []) if m.get("name")]
+            else:
+                raw_list = data.get("data") if isinstance(data.get("data"), list) else data
+                models = [m.get("id") for m in raw_list if isinstance(m, dict) and m.get("id")]
+            return [str(m) for m in models if m]
+    except Exception:
+        return [m.id for m in catalog.models_for(provider)]
+
+
+def _resolve_target_model(provider: str, model: str, cfg: dict[str, Any]) -> str:
+    """Returns user's custom configured model if set, or mapped/direct model ID."""
+    custom = settings_mod.get_provider_model(provider, cfg)
+    if custom:
+        return custom
+    return PROVIDER_MODEL_MAP.get((provider, model), model)
+
+
 def _chat_litellm(provider, model, messages, key, tools, temperature, max_tokens,
                   timeout, price_in, price_out, cfg) -> ChatResult:
     litellm = _get_litellm()
-    target_model = PROVIDER_MODEL_MAP.get((provider, model), model)
+    target_model = _resolve_target_model(provider, model, cfg)
     try:
         extra = EXTRA_HEADERS.get(provider)
         resp = litellm.completion(
@@ -196,7 +253,7 @@ def _chat_litellm(provider, model, messages, key, tools, temperature, max_tokens
 def _chat_httpx(provider, model, messages, key, tools, temperature, max_tokens,
                 timeout, price_in, price_out, cfg, client) -> ChatResult:
     base = _base_url(provider, cfg)
-    target_model = PROVIDER_MODEL_MAP.get((provider, model), model)
+    target_model = _resolve_target_model(provider, model, cfg)
     payload: dict[str, Any] = {"model": target_model, "messages": messages, "temperature": temperature}
     if tools:
         payload["tools"] = tools
@@ -252,9 +309,34 @@ def test_key(provider: str, settings: dict[str, Any] | None = None) -> tuple[boo
     if not settings_mod.has_key(provider, cfg):
         hint = "NVIDIA keys start with nvapi-" if provider == "nim" else "paste the key into the box"
         return False, f"Did not ping {label}. No API key is saved ({hint})."
+
+    custom_model = settings_mod.get_provider_model(provider, cfg)
+    if custom_model:
+        try:
+            result = chat(
+                provider, custom_model,
+                [{"role": "user", "content": "ping"}],
+                max_tokens=4, timeout=20, settings=cfg, transport="httpx",
+            )
+            n = result.tokens_in + result.tokens_out
+            return True, f"Ping OK - {label} responded via '{custom_model}' ({n} tokens)."
+        except RateLimited:
+            return True, f"Ping OK - {label} key is valid (rate limited on '{custom_model}')."
+        except ProviderError as e:
+            if e.status in (401, 403):
+                return False, f"Ping failed - {label} HTTP {e.status} (invalid or expired key) on '{custom_model}'."
+            return False, f"Ping failed on '{custom_model}': {e}"
+        except httpx.HTTPError as e:
+            return False, f"Ping failed - {label} network error: {e}"
+
     models = catalog.models_for(provider)
     if not models:
+        live = fetch_live_models(provider, cfg)
+        models = [catalog.ModelEntry(id=m_id, total_params=1, context_window=32768, tier="utility", providers=(provider,)) for m_id in live[:3]]
+
+    if not models:
         return False, f"Did not ping {label}. No catalog models for {provider}."
+
     last = "no model responded"
     tried: list[str] = []
     for m in models:
