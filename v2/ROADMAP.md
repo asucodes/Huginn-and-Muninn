@@ -13,24 +13,26 @@ This roadmap tracks the engineering evolution of **Taknee V2**. Every phase cont
 - [ ] **1.2 Clean Async Provider Client (`src/taknee/transport/`)**:
   - [ ] Build a single, async HTTPX/streaming provider client (replacing dual litellm/httpx boilerplate).
   - [ ] Add unified token counting, response streaming, and latency metrics.
-- [ ] **1.3 V2 Folder & Documentation Handoff**:
-  - [ ] Commit `v2/README.md`, `v2/ROADMAP.md`, `v2/RADAR_SYSTEM_SPEC.md`, `v2/HARNESS_ARCHITECTURE.md`, `v2/TODO.md`.
+- [x] **1.3 V2 Folder & Documentation Handoff**:
+  - [x] Commit `v2/README.md`, `v2/ROADMAP.md`, `v2/RADAR_SYSTEM_SPEC.md`, `v2/HARNESS_ARCHITECTURE.md`, `v2/TODO.md`.
 
 ---
 
 ## Phase 2: The Free-Tier Radar & Swarm Mesh
 **Goal**: Build the zero-cost compute aggregator and multi-provider rate-limit failover engine.
 
-- [ ] **2.1 Live Free-Tier Radar (`src/taknee/swarm/radar.py`)**:
-  - [ ] Live OpenRouter `:free` model probe (auto-syncs active zero-cost models).
-  - [ ] GroqCloud / Google AI Studio Gemini Flash free-tier quota & health probes.
-  - [ ] Live deal/promotional credit feed parser (Z.ai, DeepSeek, Cerebras, Cloudflare).
-- [ ] **2.2 Multi-Key Pool & Swarm Balancer (`src/taknee/swarm/rotator.py`)**:
-  - [ ] Multi-key registration for each provider in settings vault.
-  - [ ] Instant 0ms failover on HTTP 429 rate limits across provider tiers.
-  - [ ] Local Ollama / vLLM automatic offline fallback.
-- [ ] **2.3 Prompt Cache Optimizer (`src/taknee/swarm/cache_optimizer.py`)**:
-  - [ ] Deterministic prompt prefix alignment ensuring 90%+ cache hit rate on OpenRouter, Gemini, and DeepSeek.
+- [x] **2.1 Live Free-Tier Radar (`src/taknee/swarm/radar.py`)**:
+  - [x] Live OpenRouter `:free` model probe (auto-syncs active zero-cost models).
+  - [x] GroqCloud / Google AI Studio Gemini Flash free-tier quota & health probes.
+  - [x] Verified zero-cost models catalog with graceful offline fallback.
+- [x] **2.2 Multi-Key Pool & Swarm Balancer (`src/taknee/swarm/rotator.py`)**:
+  - [x] Multi-key registration for each provider in settings vault.
+  - [x] Instant 0ms failover on HTTP 429 rate limits across provider tiers.
+  - [x] Local Ollama / vLLM automatic offline fallback.
+- [x] **2.3 Prompt Cache Optimizer (`src/taknee/swarm/cache_optimizer.py`)**:
+  - [x] Deterministic prompt prefix alignment ensuring 90%+ cache hit rate on OpenRouter, Gemini, and DeepSeek.
+- [x] **2.4 Comprehensive Unit Test Suite (`tests/test_swarm_radar.py`)**:
+  - [x] Unit tests for model discovery, health cooldowns, multi-key rotation, 429 failover, and cache prefix hashing (105/105 tests passing).
 
 ---
 

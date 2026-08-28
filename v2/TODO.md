@@ -4,29 +4,29 @@ This file serves as the **central state tracker** for any developer or AI agent 
 
 ---
 
-## 1. Active Sprint: Phase 1 & 2 (Radar & Swarm Foundation)
+## 1. Active Sprint: Phase 3 (Next-Gen Autonomous Harness)
 
-### Immediate Next Tasks (Priority Order):
+### Completed Tasks in Phase 2 (Radar & Swarm):
+- [x] **Task 1: Free-Tier Live Radar (`src/taknee/swarm/radar.py`)** (OpenRouter `:free` probe, Groq/Gemini health matrix, verified offline models).
+- [x] **Task 2: Multi-Key Swarm Rotator (`src/taknee/swarm/rotator.py`)** (Multi-key per provider, instant 0ms 429 failover, local Ollama fallback).
+- [x] **Task 3: Prompt Cache Packer (`src/taknee/swarm/cache_optimizer.py`)** (Deterministic prefix hash, 90%+ KV cache optimization).
+- [x] **Task 4: Swarm Unit Tests (`tests/test_swarm_radar.py`)** (105/105 tests passing).
 
-1. [ ] **Task 1: Build the Free-Tier Live Radar (`src/taknee/swarm/radar.py`)**
-   - Implement OpenRouter `:free` model discovery (`GET https://openrouter.ai/api/v1/models`).
-   - Implement GroqCloud & Google AI Studio Gemini Flash live health probes.
-   - Add unit tests in `tests/test_swarm_radar.py`.
+### Immediate Next Tasks (Priority Order for Phase 3):
 
-2. [ ] **Task 2: Build the Multi-Key Swarm Rotator (`src/taknee/swarm/rotator.py`)**
-   - Support multiple API keys per provider in `~/.taknee/settings.json`.
-   - Implement automatic instant failover on HTTP 429 rate limit exceptions.
-   - Add local Ollama zero-cost offline fallback.
+1. [ ] **Task 3.1: Build Ephemeral Git Worktree Sandbox (`src/taknee/engine/sandbox.py`)**
+   - Implement `GitWorktreeSandbox`: creates temporary branches in `.taknee/worktrees/<task-id>`, executes jailed tools, and supports clean 1-click merge / prune.
+   - Add unit tests in `tests/test_engine_sandbox.py`.
 
-3. [ ] **Task 3: Implement Prompt Cache Packer (`src/taknee/swarm/cache_optimizer.py`)**
-   - Deterministic prompt ordering (`System Prompt -> Global Guidelines -> Repo Map -> Context Items -> Scratchpad`).
-   - Prefix hash verification for OpenRouter/Gemini cache optimization.
+2. [ ] **Task 3.2: Implement Autonomous Milestone DAG (`src/taknee/engine/graph.py`)**
+   - Replaces `orchestrator.py` with the 3-milestone event-driven ReAct loop (*Plan -> Sandbox Action Loop -> Auto-Verify -> Proof*).
+   - Add unit tests in `tests/test_engine_graph.py`.
 
-4. [ ] **Task 4: Build Ephemeral Git Worktree Manager (`src/taknee/engine/sandbox.py`)**
-   - Worktree creation, tool execution confinement, and auto-cleanup.
+3. [ ] **Task 3.3: Async PTY Terminal Manager (`src/taknee/engine/terminal.py`)**
+   - Persistent pseudo-terminal manager for interactive test runners and streaming CLI tools.
 
-5. [ ] **Task 5: Implement Milestone DAG Execution Loop (`src/taknee/engine/graph.py`)**
-   - Replaces `orchestrator.py` with the 3-milestone autonomous state graph.
+4. [ ] **Task 3.4: Integrate Tree-sitter Codebase AST Indexer (`src/taknee/index/ast_indexer.py`)**
+   - Multi-language AST definition and caller graph indexer.
 
 ---
 
@@ -34,7 +34,7 @@ This file serves as the **central state tracker** for any developer or AI agent 
 
 When picking up this codebase in a new session or turn:
 1. **Read `v2/README.md` & `v2/ROADMAP.md`** to understand the high-level architecture.
-2. **Check this `v2/TODO.md`** to identify the topmost uncompleted task in the Active Sprint.
+2. **Check this `v2/TODO.md`** to identify the topmost uncompleted task in the Active Sprint (currently: Task 3.1 `src/taknee/engine/sandbox.py`).
 3. **Execute the task**, write corresponding unit tests under `tests/`, and verify all tests pass (`.venv\Scripts\pytest -q`).
 4. **Update the checkboxes in `v2/ROADMAP.md` and `v2/TODO.md`** with completed work.
 5. **Commit the milestone** cleanly using conventional commit formatting (`feat(...)`, `refactor(...)`, `test(...)`).
