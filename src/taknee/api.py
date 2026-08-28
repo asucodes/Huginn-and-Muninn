@@ -17,9 +17,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from . import __version__, catalog, plugins, providers, settings as settings_mod
+from .engine.graph import MilestoneGraph
 from .orchestrator import Orchestrator
 from .router import Router
 from .store import Store
+from .swarm.radar import Radar
+from .swarm.rotator import SwarmRotator
 
 app = FastAPI(title="huginn-muninn-kernel", version=__version__)
 app.add_middleware(
@@ -30,8 +33,37 @@ app.add_middleware(
 )
 
 _lock = threading.Lock()
-_state: dict[str, Any] = {"workspace": None, "store": None, "orchestrators": {}}
+_state: dict[str, Any] = {
+    "workspace": None, "store": None, "orchestrators": {},
+    "v2_rotator": None,
+}
 _runner_threads: dict[str, threading.Thread] = {}
+
+# Phrases that signal the user wants a brand-new artifact created from scratch,
+# rather than editing existing code.  The V1 localize->patch pipeline cannot
+# handle these because there is no existing file to SEARCH/REPLACE against.
+_GREENFIELD_VERBS = (
+    "build me", "create a", "create an", "make a", "make an", "make me",
+    "generate a", "write a", "write me", "implement a", "implement an",
+    "build a", "build an", "scaffold", "bootstrap", "set up a",
+)
+
+
+def _is_greenfield(prompt: str) -> bool:
+    """Returns True when the prompt asks to create something from scratch."""
+    p = prompt.lower().strip()
+    return any(p.startswith(v) or f" {v} " in f" {p} " for v in _GREENFIELD_VERBS)
+
+
+def _get_v2_rotator() -> SwarmRotator:
+    """Returns (or lazily creates) the shared SwarmRotator for V2 engine tasks."""
+    if _state["v2_rotator"] is None:
+        radar = Radar()
+        rotator = SwarmRotator(radar=radar)
+        cfg = settings_mod.load()
+        rotator.register_keys_from_dict(cfg)
+        _state["v2_rotator"] = rotator
+    return _state["v2_rotator"]
 
 
 def _store() -> Store:
@@ -211,14 +243,34 @@ def create_task(body: TaskIn) -> dict:
     store = _store()
     task_id = store.create_task(body.prompt, _state["workspace"])
     store.add_message(task_id, "user", body.prompt)
-    orch = Orchestrator(
-        store, Router(), _state["workspace"], auto_approve=body.auto_approve
-    )
-    _state["orchestrators"][task_id] = orch
+    use_v2 = _is_greenfield(body.prompt)
 
     def _run():
         try:
-            orch.run(task_id)
+            if use_v2:
+                # Greenfield creation: V2 MilestoneGraph has create_file tool
+                rotator = _get_v2_rotator()
+                graph = MilestoneGraph(
+                    workspace=Path(_state["workspace"]),
+                    rotator=rotator,
+                    store=store,
+                )
+                store.add_event(task_id, "note", {"engine": "v2_milestone_graph"})
+                result = graph.run(task_id, body.prompt)
+                if result.status == "pending_review" and body.auto_approve:
+                    store.update_task(task_id, status="done")
+                elif result.status == "failed":
+                    store.update_task(task_id, status="failed", error=result.summary)
+                    store.add_message(task_id, "assistant", f"The raven did not return: {result.summary}")
+                else:
+                    store.add_message(task_id, "assistant", result.summary or "Task complete.")
+            else:
+                # Standard edit/refactor: V1 Orchestrator pipeline
+                orch = Orchestrator(
+                    store, Router(), _state["workspace"], auto_approve=body.auto_approve
+                )
+                _state["orchestrators"][task_id] = orch
+                orch.run(task_id)
         except Exception as e:  # kernel must never die with a task
             store.update_task(task_id, status="failed", error=str(e))
             store.add_event(task_id, "status", {"status": "failed", "error": str(e)})

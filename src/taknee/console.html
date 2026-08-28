@@ -596,9 +596,116 @@
     .chat-col { padding: 20px 16px 12px; }
     .composer-bar { padding: 6px 12px 10px; }
   }
+  /* ============================================================
+     splash screen — cinematic crow reveal
+     ============================================================ */
+  #splash {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0d1017;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 18px;
+    animation: splash-fade-out 0.6s ease-in 2.2s forwards;
+    pointer-events: all;
+  }
+  #splash.dismissed { display: none; }
+
+  .splash-sky {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(600px 600px at 50% 35%, rgba(235, 203, 139, 0.09), transparent 70%),
+      radial-gradient(400px 400px at 50% 35%, rgba(235, 203, 139, 0.05), transparent 60%),
+      linear-gradient(180deg, #0a0e14 0%, #111720 40%, #14171c 100%);
+  }
+
+  .splash-moon {
+    position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 80px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(235, 203, 139, 0.25) 0%, rgba(235, 203, 139, 0.04) 60%, transparent 80%);
+    animation: moon-pulse 2.4s ease-in-out infinite;
+  }
+
+  .splash-crow {
+    position: absolute; top: 42%;
+    fill: #d8dee9; opacity: 0;
+  }
+  .splash-crow--left {
+    left: -60px;
+    animation: crow-fly-left 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s forwards;
+  }
+  .splash-crow--right {
+    right: -60px;
+    animation: crow-fly-right 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.5s forwards;
+  }
+
+  .splash-title {
+    position: relative; z-index: 2;
+    font: 700 28px/1.2 var(--font);
+    color: #eceff4; letter-spacing: -0.02em;
+    opacity: 0;
+    animation: splash-text-in 0.8s ease-out 0.9s forwards;
+  }
+  .splash-title .amp { color: rgba(235, 203, 139, 0.7); font-weight: 300; margin: 0 4px; }
+  .splash-sub {
+    position: relative; z-index: 2;
+    font: 400 13px/1.5 var(--font);
+    color: #8a93a5; letter-spacing: 0.06em; text-transform: uppercase;
+    opacity: 0;
+    animation: splash-text-in 0.7s ease-out 1.3s forwards;
+  }
+
+  @keyframes crow-fly-left {
+    0% { left: -60px; opacity: 0; transform: translateY(0) rotate(-8deg); }
+    30% { opacity: 0.85; }
+    60% { transform: translateY(-18px) rotate(-2deg); }
+    100% { left: calc(50% - 90px); opacity: 0.95; transform: translateY(0) rotate(0deg); }
+  }
+  @keyframes crow-fly-right {
+    0% { right: -60px; opacity: 0; transform: translateY(0) rotate(8deg) scaleX(-1); }
+    30% { opacity: 0.85; }
+    60% { transform: translateY(-22px) rotate(2deg) scaleX(-1); }
+    100% { right: calc(50% - 90px); opacity: 0.95; transform: translateY(0) rotate(0deg) scaleX(-1); }
+  }
+  @keyframes moon-pulse {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.7; }
+    50% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  }
+  @keyframes splash-text-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes splash-fade-out {
+    from { opacity: 1; pointer-events: all; }
+    to { opacity: 0; pointer-events: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #splash { animation-duration: 0s; animation-delay: 0.8s; }
+    .splash-crow--left, .splash-crow--right { animation-duration: 0s; }
+    .splash-title, .splash-sub { animation-duration: 0s; }
+  }
 </style>
 </head>
 <body>
+
+<!-- ═══ Splash Screen ═══ -->
+<div id="splash" aria-hidden="true">
+  <div class="splash-sky"></div>
+  <div class="splash-moon"></div>
+
+  <!-- Left crow (Huginn — thought) -->
+  <svg class="splash-crow splash-crow--left" viewBox="0 0 64 40" width="56" height="35" aria-hidden="true">
+    <path d="M4 24 C6 19 10 15 16 14 C18 12 22 11 26 12 C28 10 32 9 36 10 C40 8 45 9 48 12 C52 10 56 12 58 15 C60 18 62 22 60 26 C58 30 54 33 50 34 L46 38 L48 33 C46 35 43 36 40 35 L42 31 C38 33 34 32 32 30 C30 32 26 33 24 31 C22 34 18 35 14 34 L16 30 C12 32 8 31 6 28 L4 32 Z"/>
+  </svg>
+
+  <!-- Right crow (Muninn — memory) -->
+  <svg class="splash-crow splash-crow--right" viewBox="0 0 64 40" width="56" height="35" aria-hidden="true">
+    <path d="M4 24 C6 19 10 15 16 14 C18 12 22 11 26 12 C28 10 32 9 36 10 C40 8 45 9 48 12 C52 10 56 12 58 15 C60 18 62 22 60 26 C58 30 54 33 50 34 L46 38 L48 33 C46 35 43 36 40 35 L42 31 C38 33 34 32 32 30 C30 32 26 33 24 31 C22 34 18 35 14 34 L16 30 C12 32 8 31 6 28 L4 32 Z"/>
+  </svg>
+
+  <div class="splash-title">Huginn <span class="amp">&amp;</span> Muninn</div>
+  <div class="splash-sub">thought &middot; memory</div>
+</div>
+
 <div id="app">
   <aside class="sidebar">
     <div class="logo">
@@ -2013,6 +2120,19 @@ setInterval(async () => {
 }, 4000);
 
 route();
+
+/* dismiss splash after animation completes */
+const splash = document.getElementById("splash");
+if (splash) {
+  splash.addEventListener("animationend", function handler(e) {
+    if (e.animationName === "splash-fade-out") {
+      splash.classList.add("dismissed");
+      splash.removeEventListener("animationend", handler);
+    }
+  });
+  /* safety net: force dismiss after 3.5s even if animationend doesn't fire */
+  setTimeout(() => { if (splash) splash.classList.add("dismissed"); }, 3500);
+}
 </script>
 </body>
 </html>

@@ -6,7 +6,7 @@ from taknee import api
 
 
 def _reset():
-    api._state.update({"workspace": None, "store": None, "orchestrators": {}})
+    api._state.update({"workspace": None, "store": None, "orchestrators": {}, "v2_rotator": None})
 
 
 def test_health_ok():
