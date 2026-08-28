@@ -101,6 +101,7 @@ class CommunityFeedScraper:
         with httpx.Client(timeout=self.http_timeout_s, headers=headers, follow_redirects=True) as client:
             all_deals.extend(self._fetch_reddit(client))
             all_deals.extend(self._fetch_hn(client))
+            all_deals.extend(self._fetch_github_ai_repos(client))
             all_deals.extend(self._fetch_openrouter_rss(client))
             all_deals.extend(self._fetch_provider_rss(client))
 

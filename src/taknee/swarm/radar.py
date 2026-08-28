@@ -191,18 +191,26 @@ class Radar:
         found: list[FreeModel] = []
 
         for item in raw_list:
-            model_id = item.get("id", "")
-            pricing = item.get("pricing", {})
-            prompt_price = float(pricing.get("prompt") or 0.0)
-            completion_price = float(pricing.get("completion") or 0.0)
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("id") or "")
+            pricing = item.get("pricing") if isinstance(item.get("pricing"), dict) else {}
+            try:
+                prompt_price = float(pricing.get("prompt") or 0.0)
+                completion_price = float(pricing.get("completion") or 0.0)
+            except (ValueError, TypeError):
+                prompt_price, completion_price = 0.0, 0.0
 
             # Detect free tier (:free suffix or 0 cost)
             is_zero_cost = model_id.endswith(":free") or (prompt_price == 0.0 and completion_price == 0.0)
-            if not is_zero_cost:
+            if not is_zero_cost or not model_id:
                 continue
 
-            ctx = int(item.get("context_length") or 131_072)
-            name = item.get("name") or model_id
+            try:
+                ctx = int(float(item.get("context_length") or 131_072))
+            except (ValueError, TypeError):
+                ctx = 131_072
+            name = str(item.get("name") or model_id)
             tier = "utility" if ("8b" in model_id.lower() or "mini" in model_id.lower()) else "primary"
 
             found.append(

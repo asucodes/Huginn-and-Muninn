@@ -174,10 +174,11 @@ def run_doctor(cfg: dict[str, Any] | None = None) -> None:
     rows = []
     for p_name in ["groq", "openrouter", "gemini", "ollama"]:
         health = radar.check_provider_health(p_name)
-        key_set = bool(providers_cfg.get(p_name, {}).get("key") or p_name == "ollama")
+        key_set = bool(providers_cfg.get(p_name, {}).get("key") or (p_name == "ollama" and providers_cfg.get("ollama", {}).get("enabled", False)))
         models = [m for m in radar.get_free_models() if m.provider == p_name]
         status_icon = "🟢" if (health.healthy and key_set) else ("🟡" if key_set else "⚪")
-        rows.append(f"  {status_icon} {p_name:<15} {len(models)} free models   {'[key set]' if key_set else '[no key]'}")
+        tag = "[configured]" if key_set else "[no key]"
+        rows.append(f"  {status_icon} {p_name:<15} {len(models)} free models   {tag}")
     print("\n".join(rows))
 
 

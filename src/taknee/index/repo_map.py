@@ -1,4 +1,4 @@
-﻿"""Repo Map Builder — compact, token-budgeted symbol summary of the codebase.
+"""Repo Map Builder — compact, token-budgeted symbol summary of the codebase.
 
 Uses Python stdlib `ast` module for zero-dependency Python parsing,
 with graceful fallback to simple file listing for other languages.
@@ -37,6 +37,7 @@ def extract_python_symbols(source: str, relpath: str) -> list[Symbol]:
             symbols.append(Symbol(relpath, "def", node.name, node.lineno))
         elif isinstance(node, ast.ClassDef):
             symbols.append(Symbol(relpath, "class", node.name, node.lineno))
+    symbols.sort(key=lambda s: s.line)
     return symbols
 
 

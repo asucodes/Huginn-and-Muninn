@@ -1,4 +1,4 @@
-﻿"""Git Worktree Sandbox Manager.
+"""Git Worktree Sandbox Manager.
 
 Creates ephemeral, isolated Git worktrees for each agent task so the
 agent can read, write, and test code without ever touching the user's
@@ -110,18 +110,22 @@ class GitWorktreeSandbox:
 
     def read_file(self, path: str) -> str:
         """Reads a file relative to the worktree root."""
-        full = self.worktree_root / path
-        if not str(full.resolve()).startswith(str(self.worktree_root)):
+        full = (self.worktree_root / path).resolve()
+        try:
+            full.relative_to(self.worktree_root.resolve())
+        except ValueError:
             raise SandboxError(f"Path escape attempt: {path}")
-        return full.read_text(errors="replace")
+        return full.read_text(encoding="utf-8", errors="replace")
 
     def write_file(self, path: str, content: str) -> None:
         """Writes a file relative to the worktree root."""
-        full = self.worktree_root / path
-        if not str(full.resolve()).startswith(str(self.worktree_root)):
+        full = (self.worktree_root / path).resolve()
+        try:
+            full.relative_to(self.worktree_root.resolve())
+        except ValueError:
             raise SandboxError(f"Path escape attempt: {path}")
         full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_text(content)
+        full.write_text(content, encoding="utf-8")
 
     # ── Diff & Review ──────────────────────────────────────────────────────────
 

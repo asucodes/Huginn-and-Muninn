@@ -240,6 +240,13 @@ def _git_checkout(ref: str, *, workspace: str) -> str:
     return r.stdout.strip() if r.returncode == 0 else f"git checkout error: {r.stderr}"
 
 
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
 def _web_search(query: str) -> str:
     q = (query or "").strip()
     if len(q) > 240:
@@ -251,7 +258,7 @@ def _web_search(query: str) -> str:
             r = c.post(
                 "https://html.duckduckgo.com/html/",
                 data={"q": q},
-                headers={"User-Agent": "HuginnMuninn/0.1"},
+                headers=_BROWSER_HEADERS,
             )
         html = r.text or ""
         results = re.findall(
@@ -285,7 +292,7 @@ def _strip_html(text: str) -> str:
 def _web_fetch(url: str) -> str:
     try:
         with httpx.Client(timeout=15, follow_redirects=True) as c:
-            r = c.get(url, headers={"User-Agent": "HuginnMuninn/0.1"})
+            r = c.get(url, headers=_BROWSER_HEADERS)
         body = r.text or ""
         ctype = (r.headers.get("content-type") or "").lower()
         looks_html = "html" in ctype or body.lstrip()[:15].lower().startswith(
