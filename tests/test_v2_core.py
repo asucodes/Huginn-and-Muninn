@@ -103,6 +103,20 @@ class TestGitWorktreeSandbox:
         sandbox.prune()
         assert not sandbox.path.exists()
 
+    def test_sandbox_auto_inits_non_git_workspace(self, tmp_path):
+        """A brand new folder with no git repo should auto-init and work seamlessly."""
+        # tmp_path has NO git repo and NO files
+        from taknee.engine.sandbox import GitWorktreeSandbox
+        sandbox = GitWorktreeSandbox(workspace=tmp_path, task_id="test-nongit-001")
+        sandbox.create()
+        assert sandbox.path.exists()
+        sandbox.write_file("tictactoe.py", "print('game')")
+        assert sandbox.read_file("tictactoe.py") == "print('game')"
+        sandbox.merge()
+        # After merge, file must exist in real workspace root
+        assert (tmp_path / "tictactoe.py").exists()
+        assert (tmp_path / "tictactoe.py").read_text() == "print('game')"
+
     def test_sandbox_path_jail(self, tmp_path):
         """Path traversal attempts should raise SandboxError."""
         subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)

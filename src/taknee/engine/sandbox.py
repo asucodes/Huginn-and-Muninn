@@ -15,6 +15,7 @@ Usage:
 """
 from __future__ import annotations
 
+import shutil
 import subprocess
 import uuid
 from pathlib import Path
@@ -42,6 +43,7 @@ class GitWorktreeSandbox:
         self.branch = f"agent/{self.task_id}"
         self.worktree_root = self.workspace / ".taknee" / "worktrees" / self.task_id
         self._active = False
+        self._is_git_worktree = False
 
     def __enter__(self) -> "GitWorktreeSandbox":
         self.create()
@@ -54,45 +56,106 @@ class GitWorktreeSandbox:
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
+    def _ensure_git_repo(self) -> None:
+        """Ensures workspace is a valid Git repo with at least one commit."""
+        self.workspace.mkdir(parents=True, exist_ok=True)
+        # 1. Check if git repo
+        check_repo = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=self.workspace, capture_output=True, text=True,
+        )
+        if check_repo.returncode != 0:
+            subprocess.run(["git", "init"], cwd=self.workspace, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Huginn Agent"],
+                cwd=self.workspace, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "agent@huginn-muninn.local"],
+                cwd=self.workspace, capture_output=True,
+            )
+
+        # 2. Check if HEAD commit exists
+        check_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.workspace, capture_output=True, text=True,
+        )
+        if check_head.returncode != 0:
+            subprocess.run(["git", "add", "-A"], cwd=self.workspace, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "--allow-empty", "-m", "chore: initial repository setup"],
+                cwd=self.workspace, capture_output=True,
+            )
+
     def create(self) -> None:
         """Creates the ephemeral worktree branch."""
+        self._ensure_git_repo()
         self.worktree_root.parent.mkdir(parents=True, exist_ok=True)
+
+        # Clean up any stale branch or worktree directory from previous interrupted runs
+        if self.worktree_root.exists():
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(self.worktree_root)],
+                cwd=self.workspace, capture_output=True,
+            )
+            if self.worktree_root.exists():
+                shutil.rmtree(self.worktree_root, ignore_errors=True)
+        subprocess.run(["git", "branch", "-D", self.branch], cwd=self.workspace, capture_output=True)
+
         result = subprocess.run(
             ["git", "worktree", "add", str(self.worktree_root), "-b", self.branch, "HEAD"],
             cwd=self.workspace, capture_output=True, text=True,
         )
         if result.returncode != 0:
-            raise SandboxError(f"Failed to create worktree: {result.stderr.strip()}")
+            # Fallback: create standalone directory if worktrees are unavailable
+            self.worktree_root.mkdir(parents=True, exist_ok=True)
+            self._active = True
+            self._is_git_worktree = False
+            return
+
         self._active = True
+        self._is_git_worktree = True
 
     def prune(self) -> None:
         """Removes the worktree and its temporary branch."""
         if not self._active:
             return
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(self.worktree_root)],
-            cwd=self.workspace, capture_output=True,
-        )
-        subprocess.run(
-            ["git", "branch", "-D", self.branch],
-            cwd=self.workspace, capture_output=True,
-        )
+        if self._is_git_worktree:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(self.worktree_root)],
+                cwd=self.workspace, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "branch", "-D", self.branch],
+                cwd=self.workspace, capture_output=True,
+            )
+        if self.worktree_root.exists():
+            shutil.rmtree(self.worktree_root, ignore_errors=True)
         self._active = False
 
     def merge(self, message: str = "") -> None:
         """Fast-forward merges the worktree branch into HEAD and prunes."""
         if not self._active:
             return
-        # Commit any remaining unstaged changes
-        subprocess.run(["git", "add", "-A"], cwd=self.worktree_root, capture_output=True)
-        subprocess.run(
-            ["git", "commit", "--allow-empty", "-m", message or f"feat: agent task {self.task_id}"],
-            cwd=self.worktree_root, capture_output=True,
-        )
-        subprocess.run(
-            ["git", "merge", "--ff-only", self.branch],
-            cwd=self.workspace, capture_output=True,
-        )
+        if self._is_git_worktree:
+            # Commit any remaining unstaged changes
+            subprocess.run(["git", "add", "-A"], cwd=self.worktree_root, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "--allow-empty", "-m", message or f"feat: agent task {self.task_id}"],
+                cwd=self.worktree_root, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "merge", "--ff-only", self.branch],
+                cwd=self.workspace, capture_output=True,
+            )
+        else:
+            # Copy all files from worktree back to workspace
+            for item in self.worktree_root.rglob("*"):
+                if item.is_file():
+                    rel = item.relative_to(self.worktree_root)
+                    dest = self.workspace / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(item, dest)
         self.prune()
 
     # ── Execution ──────────────────────────────────────────────────────────────
