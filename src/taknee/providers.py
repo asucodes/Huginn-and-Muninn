@@ -55,13 +55,21 @@ LITELLM_PREFIX = {
 
 # Provider-specific slug translation so standard catalog models map cleanly
 PROVIDER_MODEL_MAP: dict[tuple[str, str], str] = {
-    ("groq", "meta-llama/llama-3.3-70b-instruct"): "llama-3.3-70b-versatile",
-    ("groq", "meta-llama/llama-3.1-8b-instruct"): "llama-3.1-8b-instant",
-    ("groq", "qwen/qwen3-8b"): "llama-3.1-8b-instant",
-    ("groq", "openai/gpt-oss-20b"): "llama-3.3-70b-versatile",
-    ("openrouter", "mistralai/devstral-small-2-24b-instruct"): "mistralai/mistral-small-24b-instruct-2501",
-    ("openrouter", "openai/gpt-oss-20b"): "qwen/qwen-2.5-coder-32b-instruct:free",
-    ("openrouter", "qwen/qwen3-8b"): "qwen/qwen-2.5-7b-instruct:free",
+    # Groq (live 2026 models)
+    ("groq", "openai/gpt-oss-20b"): "openai/gpt-oss-20b",
+    ("groq", "qwen/qwen3-8b"): "qwen/qwen3.6-27b",
+    ("groq", "meta-llama/llama-3.3-70b-instruct"): "openai/gpt-oss-20b",
+    ("groq", "meta-llama/llama-3.1-8b-instruct"): "qwen/qwen3.6-27b",
+    ("groq", "qwen/qwen3-coder-30b-a3b-instruct"): "qwen/qwen3.8-27b",
+    # OpenRouter
+    ("openrouter", "qwen/qwen3-8b"): "qwen/qwen3.8-flash",
+    ("openrouter", "qwen/qwen3-coder-30b-a3b-instruct"): "qwen/qwen3.8-27b",
+    ("openrouter", "mistralai/devstral-small-2-24b-instruct"): "mistralai/mistral-small-2603",
+    ("openrouter", "openai/gpt-oss-20b"): "qwen/qwen3.8-flash",
+    ("openrouter", "meta-llama/llama-3.3-70b-instruct"): "qwen/qwen3.8-27b",
+    # NVIDIA NIM
+    ("nim", "nvidia/llama-3.1-nemotron-nano-8b-v1"): "meta/llama-3.2-11b-vision-instruct",
+    ("nim", "meta/llama-3.3-70b-instruct"): "meta/llama-3.2-11b-vision-instruct",
 }
 
 # OpenRouter asks for these; some keys 404 without a referer.
@@ -72,7 +80,11 @@ EXTRA_HEADERS = {
     },
 }
 
-_UNAVAILABLE = ("no endpoints", "not found", "does not exist", "unknown model", "model_not_found")
+_UNAVAILABLE = (
+    "no endpoints", "not found", "does not exist", "unknown model", "model_not_found",
+    "unavailable for free", "is unavailable", "reached its end of life", "gone",
+    "no longer available", "unsupported_model", "invalid_request_error",
+)
 
 
 class ProviderError(Exception):
