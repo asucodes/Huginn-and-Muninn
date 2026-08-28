@@ -1,0 +1,38 @@
+{
+  "name": "taknee",
+  "displayName": "Huginn & Muninn",
+  "description": "Agentic coding for small open-weight models (<=80B)",
+  "version": "0.1.0",
+  "engines": {"vscode": "^1.85.0"},
+  "categories": ["Programming Languages", "Chat", "Debuggers", "Testing"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{"id": "taknee", "title": "Huginn & Muninn", "icon": "media/taknee.svg"}]
+    },
+    "views": {
+      "taknee": [
+        {"type": "webview", "id": "taknee.chat", "name": "Agent"},
+        {"type": "webview", "id": "taknee.traces", "name": "Traces"},
+        {"type": "webview", "id": "taknee.review", "name": "Review"},
+        {"type": "webview", "id": "taknee.settings", "name": "Settings"}
+      ]
+    },
+    "commands": [
+      {"command": "taknee.openSettings", "title": "H&M: Settings / API Keys", "category": "Huginn & Muninn"},
+      {"command": "taknee.newTask", "title": "H&M: New Task", "category": "Huginn & Muninn"},
+      {"command": "taknee.openTraces", "title": "H&M: Open Traces", "category": "Huginn & Muninn"}
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

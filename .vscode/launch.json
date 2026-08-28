@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Taknee Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
+        "${workspaceFolder}"
+      ],
+      "outFiles": ["${workspaceFolder}/apps/extension/out/**/*.js"]
+    }
+  ]
+}
