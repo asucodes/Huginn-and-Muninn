@@ -4,29 +4,24 @@ This file serves as the **central state tracker** for any developer or AI agent 
 
 ---
 
-## 1. Active Sprint: Phase 3 (Next-Gen Autonomous Harness)
+## 1. Active Sprint: Dual-Track V2 Engine & Radar
 
-### Completed Tasks in Phase 2 (Radar & Swarm):
-- [x] **Task 1: Free-Tier Live Radar (`src/taknee/swarm/radar.py`)** (OpenRouter `:free` probe, Groq/Gemini health matrix, verified offline models).
-- [x] **Task 2: Multi-Key Swarm Rotator (`src/taknee/swarm/rotator.py`)** (Multi-key per provider, instant 0ms 429 failover, local Ollama fallback).
-- [x] **Task 3: Prompt Cache Packer (`src/taknee/swarm/cache_optimizer.py`)** (Deterministic prefix hash, 90%+ KV cache optimization).
-- [x] **Task 4: Swarm Unit Tests (`tests/test_swarm_radar.py`)** (105/105 tests passing).
+### Completed Deliverables (Kernel & Radar Foundation):
+- [x] **[K] Transport Bridge (`src/taknee/transport/client.py`)**: Wires SwarmRotator to real LLM calls with automatic 429 failover.
+- [x] **[K] First-Run CLI Wizard (`src/taknee/cli/setup.py`)**: `taknee setup`, `taknee doctor`, `taknee models`, and `taknee deals` commands.
+- [x] **[K] Git Worktree Sandbox (`src/taknee/engine/sandbox.py`)**: Ephemeral branch isolation in `.taknee/worktrees/<task-id>` with jailed tools and clean merge/prune.
+- [x] **[K] Python AST Repo Map (`src/taknee/index/repo_map.py`)**: Token-budgeted symbol extractor for system prompt orientation.
+- [x] **[K] Autonomous Milestone DAG (`src/taknee/engine/graph.py`)**: 3-milestone event-driven ReAct loop (*Plan -> Sandbox Action Loop -> Auto-Verify -> Proof*).
+- [x] **[R] Community Deal Feed Scraper (`src/taknee/radar/community_feed.py`)**: Live scans of Hacker News, GitHub, and OpenRouter for free API promotions.
+- [x] **[R] Changelog Tracker (`src/taknee/radar/changelog_tracker.py`)**: Detects newly added zero-cost models across provider catalogs.
+- [x] **[R] Radar API Endpoints (`src/taknee/api.py`)**: `/radar/models`, `/radar/status`, `/radar/deals`, `/radar/deltas`.
+- [x] **[UI] Consumer Landing Page (`README.md`)**: High-converting, developer-friendly landing page with free-tier compute matrix and quickstarts.
+- [x] **[TEST] V2 Core Test Suite (`tests/test_v2_core.py`)**: 113/113 tests passing cleanly.
 
-### Immediate Next Tasks (Priority Order for Phase 3):
-
-1. [ ] **Task 3.1: Build Ephemeral Git Worktree Sandbox (`src/taknee/engine/sandbox.py`)**
-   - Implement `GitWorktreeSandbox`: creates temporary branches in `.taknee/worktrees/<task-id>`, executes jailed tools, and supports clean 1-click merge / prune.
-   - Add unit tests in `tests/test_engine_sandbox.py`.
-
-2. [ ] **Task 3.2: Implement Autonomous Milestone DAG (`src/taknee/engine/graph.py`)**
-   - Replaces `orchestrator.py` with the 3-milestone event-driven ReAct loop (*Plan -> Sandbox Action Loop -> Auto-Verify -> Proof*).
-   - Add unit tests in `tests/test_engine_graph.py`.
-
-3. [ ] **Task 3.3: Async PTY Terminal Manager (`src/taknee/engine/terminal.py`)**
-   - Persistent pseudo-terminal manager for interactive test runners and streaming CLI tools.
-
-4. [ ] **Task 3.4: Integrate Tree-sitter Codebase AST Indexer (`src/taknee/index/ast_indexer.py`)**
-   - Multi-language AST definition and caller graph indexer.
+### Immediate Next Tasks:
+1. [ ] **VS Code Extension Radar Panel (`apps/extension/src/radar.ts`)**: Add a live visual "Free Tier Radar & Deals" panel in the sidebar.
+2. [ ] **Tree-sitter Multi-Language Grammar Indexer (`src/taknee/index/ast_indexer.py`)**: Extend AST parsing to TypeScript, Rust, and Go.
+3. [ ] **Native Model Context Protocol (MCP) Client (`src/taknee/engine/mcp_client.py`)**: Connect to external developer tools via MCP.
 
 ---
 

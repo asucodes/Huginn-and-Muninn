@@ -554,3 +554,55 @@ def call_tool(body: ToolCallIn) -> dict:
         body.name, body.arguments, workspace=ws, index_ref=index_ref
     )
     return {"name": body.name, "output": output, "blocked": False}
+
+
+# -- Free-Tier Radar & V2 Autonomous Endpoints -------------------------------
+
+@app.get("/radar/models")
+def get_radar_models(refresh: bool = False) -> dict:
+    from .swarm.radar import Radar
+    radar = Radar()
+    models = radar.get_free_models(force_refresh=refresh)
+    return {
+        "models": [m.to_dict() for m in models],
+        "count": len(models),
+    }
+
+
+@app.get("/radar/status")
+def get_radar_status() -> dict:
+    from .swarm.radar import Radar
+    from .swarm.rotator import SwarmRotator
+    radar = Radar()
+    cfg = settings_mod.load()
+    rotator = SwarmRotator(radar=radar)
+    rotator.register_keys_from_dict(cfg)
+
+    statuses = []
+    for p in ["groq", "openrouter", "gemini", "ollama", "nim", "cerebras"]:
+        st = radar.check_provider_health(p)
+        statuses.append(st.to_dict())
+    return {"providers": statuses, "free_first": True}
+
+
+@app.get("/radar/deals")
+def get_radar_deals(refresh: bool = False) -> dict:
+    from .radar.community_feed import CommunityFeedScraper
+    scraper = CommunityFeedScraper()
+    deals = scraper.get_deals(force_refresh=refresh)
+    return {
+        "deals": [d.to_dict() for d in deals],
+        "count": len(deals),
+    }
+
+
+@app.get("/radar/deltas")
+def get_radar_deltas() -> dict:
+    from .radar.changelog_tracker import ChangelogTracker
+    tracker = ChangelogTracker()
+    deltas = tracker.detect_new_models()
+    return {
+        "new_models": [d.to_dict() for d in deltas],
+        "count": len(deltas),
+    }
+

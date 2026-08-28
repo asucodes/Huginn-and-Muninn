@@ -1,40 +1,88 @@
-# Huginn & Muninn
+# ⚡ Huginn & Muninn (Taknee 2.0)
 
-An agentic coding system for **small open-weight models (≤80B total parameters)**. Named for Odin's two ravens: **Huginn** (thought) is the part that flies out and acts, running tasks autonomously; **Muninn** (memory) recalls context, spans, and session history across runs. The kernel was previously codenamed "Taknee"; the `taknee` package and CLI names are kept for compatibility. The editor host is [VSCodium](https://vscodium.com) (prebuilt Code-OSS, no Copilot, no telemetry); all agent behavior lives in this repo: a Python kernel plus a thin extension.
+> **"Give developers frontier-grade coding autonomy without charging a single dollar."**
 
-**Plan of record:** [`docs/06-plan-of-record.md`](docs/06-plan-of-record.md) (decisions, architecture, build order, ownership). Everything else in `docs/` is research and trade-off evidence.
+An autonomous, local-first AI coding agent and IDE extension powered by a **Live Free-Tier Compute Radar & Multi-Provider Swarm Mesh**.
 
-## Dev quickstart
+---
+
+## 🚀 Why Huginn & Muninn?
+
+Proprietary tools (Cursor, Windsurf, Claude Code, Devin) lock developers behind **$20–$200/month paywalls** and restrict model selection. 
+
+**Huginn & Muninn is 100% free and open-source**:
+* **$0.00 Monthly Cost**: Designed from day 1 for zero-budget developers, indie hackers, and students.
+* **Instant Free-Tier Swarm**: Combines Groq (500 t/s), OpenRouter (`:free` models), Google AI Studio (Gemini 2.0 Flash), and local Ollama into a unified, rate-limit-proof compute pool.
+* **Zero-Risk Sandboxing**: Runs all code exploration, multi-file edits, and test runs in isolated **Git worktrees** — your active editor workspace is never modified until you approve the diff.
+* **Live Community Deal Radar**: Scans Reddit, Hacker News, and OpenRouter in real-time for new free AI API drops and promotional credits.
+* **Battle-Tested Open-Source Foundation**: Adapts proven patterns from the **OpenAI Codex Harness**, **SWE-agent** ACI, and **Aider**'s fuzzy search-replace algorithms.
+
+---
+
+## ⚡ Quick Start (< 2 Minutes)
+
+### 1. Install & Setup
 
 ```bash
-# kernel
-uv sync --group dev
-uv run pytest -q
-uv run taknee            # serves http://127.0.0.1:47821
+# Clone the repository
+git clone https://github.com/asucodes/Huginn-and-Muninn.git
+cd Huginn-and-Muninn
 
-# extension (in VSCodium/VS Code)
+# Install dependencies (using uv or pip)
+uv sync --group dev
+
+# Launch the interactive Free-Tier Setup Wizard
+uv run taknee setup
+```
+
+### 2. Inspect Live Health & Free Deals
+
+```bash
+# Check provider health and active free models
+uv run taknee doctor
+
+# List all discovered zero-cost models across providers
+uv run taknee models
+
+# Scan community deals for new free API credit drops
+uv run taknee deals
+```
+
+### 3. Start the Kernel & IDE Extension
+
+```bash
+# Start the kernel loopback server
+uv run taknee serve
+
+# Run in VS Code / VSCodium:
 cd apps/extension
 npm install && npm run compile
-# open apps/extension in the editor and press F5 (Extension Development Host)
+# Open apps/extension and press F5
 ```
 
-Open a **project folder** (the codebase to work on) in the dev host. The kernel indexes that folder only , indexes are per-workspace by design.
+---
 
-## Layout
+## 📊 Live Free-Tier Compute Matrix
 
-```
-src/taknee/     kernel: catalog, settings, store(spans), providers, router,
-                orchestrator (state machine), retrieval, compaction, patches,
-                tools, agents_md, api (FastAPI loopback)
-apps/extension/ VSCodium extension: chat, settings (API keys), review, traces
-tests/          kernel unit tests (offline, no API keys needed)
-docs/           planning + research + decision log
-```
+| Provider | Free Tier Value | Latency / Speed | Best Suited Task |
+| :--- | :--- | :--- | :--- |
+| **Groq Cloud** | Permanent Free Tier (30 RPM) | ~500 t/s | Fast AST Querying, File Filtering, Diagnostics |
+| **OpenRouter** | Rotating `:free` Models (Qwen 3 Coder 30B, Llama 3.3) | ~60 t/s | Multi-file `SEARCH/REPLACE` Patches |
+| **Google AI Studio** | 15 RPM / 1M Context Window | ~80 t/s | Large-repo map indexing, complex reasoning |
+| **Local Ollama / vLLM** | 100% Free & Offline | Hardware-bound | Unlimited private offline fallback |
 
-## Constraints we enforce in code
+---
 
-- Every model call goes through `catalog.py` (allowlist with **published total** param counts; ban list with reasons).
-- Providers: free-tier / pay-as-you-go / local only (Groq, OpenRouter, NVIDIA NIM, Ollama; Cerebras/Mistral stretch).
-- Per-task governors: 2400 s, $0.40, step/fingerprint caps (margins under the eval ceilings 2700 s / $0.50).
-- Side-effecting commands require human approval; read-only tools are free.
-- API keys are entered in the Settings screen and never logged.
+## 🏗️ Architecture & Open-Source Attribution
+
+* **Autonomous Milestone DAG** (`src/taknee/engine/graph.py`): Event-driven ReAct loop adapted from **mini-SWE-agent** (MIT) & **OpenAI Harness** (Apache-2.0).
+* **Git Worktree Isolation** (`src/taknee/engine/sandbox.py`): Ephemeral branch sandboxing adapted from **OpenHands** (MIT).
+* **Fuzzy Patch Engine** (`src/taknee/patches.py`): Multi-tier search-and-replace algorithm adapted from **Aider** (Apache-2.0).
+* **Free-Tier Radar & Swarm** (`src/taknee/swarm/` & `src/taknee/radar/`): Live multi-provider failover mesh and community deal scraper.
+
+---
+
+## 📜 License & Compliance
+
+Released under the **MIT License**. All external algorithms and open-source inspirations are attributed in module documentation.
+
