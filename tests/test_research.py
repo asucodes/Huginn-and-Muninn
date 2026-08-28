@@ -136,3 +136,17 @@ Top systems: UNKNOWN
         today="2026-08-28",
     )
     assert grade.ok, grade.reasons
+
+
+def test_prioritizes_explicit_prompt_urls():
+    prompt = """Write ./kernel_org_brief.md
+Rules:
+- Forbidden in the file: "System A"
+Process:
+1. Search or open https://www.kernel.org/
+"""
+    queries = research.search_queries(prompt)
+    assert "System A" not in queries
+
+    urls = research.select_fetch_urls(prompt, ["https://other-searched-url.com"])
+    assert urls[0] == "https://www.kernel.org/"

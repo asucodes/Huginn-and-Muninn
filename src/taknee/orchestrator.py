@@ -35,9 +35,9 @@ MAX_TOOL_ROUNDS = 4
 TARGET_WORKING_CONTEXT = 24_000  # tokens — small models rot beyond this (docs/02 §4.3)
 
 RESEARCH_PATCH_PROMPT = """You are the patch stage of a research-write agent. \
-Produce ONE new-file SEARCH/REPLACE block for the requested markdown file.
+Produce ONE new-file SEARCH/REPLACE block for the requested file.
 
-```<exact-filename>
+```{filename}
 <<<<<<< SEARCH
 =======
 <full file>
@@ -51,7 +51,7 @@ Rules:
 - List only URLs that appear in the fetched observations.
 - Do not copy the user's instruction outline as the file body.
 - The retrieval date is the pinned ISO date, not a date you remember.
-- SEARCH must be empty (new file). The fence path must be the requested filename exactly."""
+- SEARCH must be empty (new file). The fence path must be '{filename}'."""
 
 PATCH_PROMPT = """You are the patch stage of a coding agent. Produce edits as \
 SEARCH/REPLACE blocks, one per change, using this exact format inside fences:
@@ -432,11 +432,14 @@ class Orchestrator:
 
     def _stage_patch(self, task_id: str, prompt: str, iteration: int) -> list[patches.PatchBlock]:
         span = self.store.add_span(task_id, "stage", "patch")
-        system = RESEARCH_PATCH_PROMPT if self._research else PATCH_PROMPT
+        wanted = research.requested_files(prompt) if self._research else []
+        default_file = wanted[0] if wanted else None
+        target_fn = default_file or "output.md"
         if self._research:
-            wanted = research.requested_files(prompt)
-            if wanted:
-                system += f"\nRequested filename: {wanted[0]}"
+            system = RESEARCH_PATCH_PROMPT.replace("{filename}", target_fn)
+            system += f"\nRequested target file: {target_fn}"
+        else:
+            system = PATCH_PROMPT
         result, _route = self._llm(
             task_id, span, "patch", "primary",
             [
@@ -445,8 +448,6 @@ class Orchestrator:
             ],
             iteration=iteration,
         )
-        wanted = research.requested_files(prompt) if self._research else []
-        default_file = wanted[0] if wanted else None
         blocks = patches.parse(result.content, default_file=default_file)
         fp = patches.hash_text(result.content)
         self._fingerprints[f"patch:{fp}"] += 1
@@ -614,7 +615,7 @@ class Orchestrator:
                 ):
                     # A refused Ollama connection is an unavailable provider,
                     # not two separately missing local models.
-                    self.router.record_failure(route.provider)
+                    self.router.record_failure(route.provider, retry_after=300.0)
                 else:
                     self.router.record_model_skip(route.provider, route.model)
                 self.store.end_span(span, {"error": str(e)[:400]})

@@ -153,7 +153,13 @@ def search_queries(prompt: str) -> list[str]:
     """Harness-owned queries. Never dump the instruction block into the search box."""
     if is_gaia_assistant_task(prompt):
         return list(GAIA_QUERIES)
-    queries: list[str] = re.findall(r'"([^"]{8,120})"', prompt)
+    queries: list[str] = []
+    # Avoid quoted strings that are forbidden/prohibited instructions (e.g. Forbidden: "System A")
+    for match in re.finditer(r'(?:(forbidden|not|never|avoid|no|like|without|placeholder)\s+[^."\n]{0,20})?"([^"]{3,120})"', prompt, re.IGNORECASE):
+        neg = match.group(1)
+        q = match.group(2).strip()
+        if not neg and len(q) >= 4 and q not in queries:
+            queries.append(q)
     for path in requested_files(prompt):
         stem = re.sub(r"[_-]+", " ", Path(path).stem).strip()
         if stem and stem not in queries:
@@ -167,7 +173,7 @@ def search_queries(prompt: str) -> list[str]:
 def urls_from_text(text: str) -> list[str]:
     urls: list[str] = []
     for raw in URL_RE.findall(text or ""):
-        url = raw.rstrip(".,;:)")
+        url = raw.rstrip(".,;:)>\"'")
         if url not in urls:
             urls.append(url)
     return urls
@@ -185,8 +191,13 @@ def is_wrong_entity_url(prompt: str, url: str) -> bool:
 
 
 def select_fetch_urls(prompt: str, found: list[str]) -> list[str]:
-    """Keep on-entity URLs; seed the official GAIA pages if search drifted."""
+    """Keep on-entity URLs; prioritize explicit prompt URLs; seed GAIA pages if needed."""
     kept: list[str] = []
+    # 1. Explicit URLs written in the prompt get top priority
+    for url in urls_from_text(prompt):
+        if url not in kept and not is_wrong_entity_url(prompt, url):
+            kept.append(url)
+    # 2. URLs discovered from web search
     for url in found:
         if is_wrong_entity_url(prompt, url):
             continue

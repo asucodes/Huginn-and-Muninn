@@ -53,6 +53,17 @@ LITELLM_PREFIX = {
     "ollama": "ollama/",
 }
 
+# Provider-specific slug translation so standard catalog models map cleanly
+PROVIDER_MODEL_MAP: dict[tuple[str, str], str] = {
+    ("groq", "meta-llama/llama-3.3-70b-instruct"): "llama-3.3-70b-versatile",
+    ("groq", "meta-llama/llama-3.1-8b-instruct"): "llama-3.1-8b-instant",
+    ("groq", "qwen/qwen3-8b"): "llama-3.1-8b-instant",
+    ("groq", "openai/gpt-oss-20b"): "llama-3.3-70b-versatile",
+    ("openrouter", "mistralai/devstral-small-2-24b-instruct"): "mistralai/mistral-small-24b-instruct-2501",
+    ("openrouter", "openai/gpt-oss-20b"): "qwen/qwen-2.5-coder-32b-instruct:free",
+    ("openrouter", "qwen/qwen3-8b"): "qwen/qwen-2.5-7b-instruct:free",
+}
+
 # OpenRouter asks for these; some keys 404 without a referer.
 EXTRA_HEADERS = {
     "openrouter": {
@@ -136,10 +147,11 @@ def chat(
 def _chat_litellm(provider, model, messages, key, tools, temperature, max_tokens,
                   timeout, price_in, price_out, cfg) -> ChatResult:
     litellm = _get_litellm()
+    target_model = PROVIDER_MODEL_MAP.get((provider, model), model)
     try:
         extra = EXTRA_HEADERS.get(provider)
         resp = litellm.completion(
-            model=f"{LITELLM_PREFIX.get(provider, '')}{model}",
+            model=f"{LITELLM_PREFIX.get(provider, '')}{target_model}",
             messages=messages,
             temperature=temperature,
             tools=tools,
@@ -172,7 +184,8 @@ def _chat_litellm(provider, model, messages, key, tools, temperature, max_tokens
 def _chat_httpx(provider, model, messages, key, tools, temperature, max_tokens,
                 timeout, price_in, price_out, cfg, client) -> ChatResult:
     base = _base_url(provider, cfg)
-    payload: dict[str, Any] = {"model": model, "messages": messages, "temperature": temperature}
+    target_model = PROVIDER_MODEL_MAP.get((provider, model), model)
+    payload: dict[str, Any] = {"model": target_model, "messages": messages, "temperature": temperature}
     if tools:
         payload["tools"] = tools
     if max_tokens:

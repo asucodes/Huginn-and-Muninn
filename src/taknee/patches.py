@@ -80,10 +80,19 @@ _FILE_EXTENSIONS = (
 )
 
 
+_PLACEHOLDER_FILENAMES = {
+    "<exact-filename>", "<filename>", "<file-name>", "<exact_filename>",
+    "<path>", "<file_path>", "<relative/file/path>", "<exact-file-name>",
+    "exact-filename", "filename", "file", "path", "exact_filename", "<full file>",
+}
+
+
 def _is_valid_path(p: str) -> bool:
     if not p:
         return False
     p = p.strip()
+    if p.lower() in _PLACEHOLDER_FILENAMES:
+        return False
     if p.endswith(":") or p.endswith("?") or p.endswith("!"):
         return False
     if " " in p:
@@ -104,8 +113,13 @@ def parse(text: str, default_file: str | None = None) -> list[PatchBlock]:
         header = m.group("header").strip()
         body_path = (m.group("body_path") or "").strip()
         path = body_path or header
+        if path.lower() in _PLACEHOLDER_FILENAMES:
+            path = default_file or ""
         if not path or (header.lower() in _FENCE_LANGUAGES and not body_path):
-            continue
+            if default_file:
+                path = default_file
+            else:
+                continue
         blocks.append(PatchBlock(path, m.group("search"), m.group("replace")))
     if blocks:
         return blocks
@@ -121,7 +135,7 @@ def parse(text: str, default_file: str | None = None) -> list[PatchBlock]:
             path = body
         else:
             path = default_file or ""
-        if path.lower() in _FENCE_LANGUAGES:
+        if path.lower() in _FENCE_LANGUAGES or path.lower() in _PLACEHOLDER_FILENAMES:
             path = default_file or ""
         if path:
             blocks.append(PatchBlock(path, m.group("search"), m.group("replace")))
