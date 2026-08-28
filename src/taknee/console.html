@@ -597,113 +597,91 @@
     .composer-bar { padding: 6px 12px 10px; }
   }
   /* ============================================================
-     splash screen — cinematic crow reveal
+     splash screen — ultra-minimal emblem reveal (Linear / WhatsApp style)
      ============================================================ */
   #splash {
     position: fixed; inset: 0; z-index: 9999;
-    background: #0d1017;
+    background: #11141a;
     display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 18px;
-    animation: splash-fade-out 0.6s ease-in 2.2s forwards;
+    flex-direction: column; gap: 20px;
+    animation: splash-exit 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.8s forwards;
     pointer-events: all;
   }
   #splash.dismissed { display: none; }
 
-  .splash-sky {
-    position: absolute; inset: 0;
-    background:
-      radial-gradient(600px 600px at 50% 35%, rgba(235, 203, 139, 0.09), transparent 70%),
-      radial-gradient(400px 400px at 50% 35%, rgba(235, 203, 139, 0.05), transparent 60%),
-      linear-gradient(180deg, #0a0e14 0%, #111720 40%, #14171c 100%);
+  .splash-center {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    animation: splash-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  .splash-moon {
-    position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
-    width: 80px; height: 80px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(235, 203, 139, 0.25) 0%, rgba(235, 203, 139, 0.04) 60%, transparent 80%);
-    animation: moon-pulse 2.4s ease-in-out infinite;
+  .splash-emblem {
+    width: 68px; height: 68px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(235, 203, 139, 0.14) 0%, rgba(20, 23, 28, 0.8) 70%);
+    border: 1px solid rgba(235, 203, 139, 0.35);
+    box-shadow: 0 0 40px rgba(235, 203, 139, 0.15), 0 8px 24px rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
   }
 
-  .splash-crow {
-    position: absolute; top: 42%;
-    fill: #d8dee9; opacity: 0;
+  .splash-brand {
+    font: 600 17px/1 var(--font);
+    color: #eceff4; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 6px;
   }
-  .splash-crow--left {
-    left: -60px;
-    animation: crow-fly-left 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s forwards;
-  }
-  .splash-crow--right {
-    right: -60px;
-    animation: crow-fly-right 1.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.5s forwards;
-  }
+  .splash-brand .amp { color: var(--warn); font-weight: 300; }
 
-  .splash-title {
-    position: relative; z-index: 2;
-    font: 700 28px/1.2 var(--font);
-    color: #eceff4; letter-spacing: -0.02em;
-    opacity: 0;
-    animation: splash-text-in 0.8s ease-out 0.9s forwards;
-  }
-  .splash-title .amp { color: rgba(235, 203, 139, 0.7); font-weight: 300; margin: 0 4px; }
   .splash-sub {
-    position: relative; z-index: 2;
-    font: 400 13px/1.5 var(--font);
-    color: #8a93a5; letter-spacing: 0.06em; text-transform: uppercase;
-    opacity: 0;
-    animation: splash-text-in 0.7s ease-out 1.3s forwards;
+    font: 500 10.5px/1 var(--font);
+    color: #727b8e; letter-spacing: 0.12em; text-transform: uppercase;
   }
 
-  @keyframes crow-fly-left {
-    0% { left: -60px; opacity: 0; transform: translateY(0) rotate(-8deg); }
-    30% { opacity: 0.85; }
-    60% { transform: translateY(-18px) rotate(-2deg); }
-    100% { left: calc(50% - 90px); opacity: 0.95; transform: translateY(0) rotate(0deg); }
+  .splash-bar {
+    position: absolute; bottom: 36px;
+    width: 120px; height: 2px; border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
   }
-  @keyframes crow-fly-right {
-    0% { right: -60px; opacity: 0; transform: translateY(0) rotate(8deg) scaleX(-1); }
-    30% { opacity: 0.85; }
-    60% { transform: translateY(-22px) rotate(2deg) scaleX(-1); }
-    100% { right: calc(50% - 90px); opacity: 0.95; transform: translateY(0) rotate(0deg) scaleX(-1); }
+  .splash-bar::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--accent-2), transparent);
+    animation: splash-shimmer 0.75s ease-in-out infinite;
   }
-  @keyframes moon-pulse {
-    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.7; }
-    50% { transform: translateX(-50%) scale(1.15); opacity: 1; }
+
+  @keyframes splash-enter {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
   }
-  @keyframes splash-text-in {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+  @keyframes splash-exit {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(1.02); pointer-events: none; }
   }
-  @keyframes splash-fade-out {
-    from { opacity: 1; pointer-events: all; }
-    to { opacity: 0; pointer-events: none; }
+  @keyframes splash-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    #splash { animation-duration: 0s; animation-delay: 0.8s; }
-    .splash-crow--left, .splash-crow--right { animation-duration: 0s; }
-    .splash-title, .splash-sub { animation-duration: 0s; }
+    #splash { display: none; }
   }
 </style>
 </head>
 <body>
 
-<!-- ═══ Splash Screen ═══ -->
+<!-- ═══ Clean Minimal Splash Screen ═══ -->
 <div id="splash" aria-hidden="true">
-  <div class="splash-sky"></div>
-  <div class="splash-moon"></div>
-
-  <!-- Left crow (Huginn — thought) -->
-  <svg class="splash-crow splash-crow--left" viewBox="0 0 64 40" width="56" height="35" aria-hidden="true">
-    <path d="M4 24 C6 19 10 15 16 14 C18 12 22 11 26 12 C28 10 32 9 36 10 C40 8 45 9 48 12 C52 10 56 12 58 15 C60 18 62 22 60 26 C58 30 54 33 50 34 L46 38 L48 33 C46 35 43 36 40 35 L42 31 C38 33 34 32 32 30 C30 32 26 33 24 31 C22 34 18 35 14 34 L16 30 C12 32 8 31 6 28 L4 32 Z"/>
-  </svg>
-
-  <!-- Right crow (Muninn — memory) -->
-  <svg class="splash-crow splash-crow--right" viewBox="0 0 64 40" width="56" height="35" aria-hidden="true">
-    <path d="M4 24 C6 19 10 15 16 14 C18 12 22 11 26 12 C28 10 32 9 36 10 C40 8 45 9 48 12 C52 10 56 12 58 15 C60 18 62 22 60 26 C58 30 54 33 50 34 L46 38 L48 33 C46 35 43 36 40 35 L42 31 C38 33 34 32 32 30 C30 32 26 33 24 31 C22 34 18 35 14 34 L16 30 C12 32 8 31 6 28 L4 32 Z"/>
-  </svg>
-
-  <div class="splash-title">Huginn <span class="amp">&amp;</span> Muninn</div>
-  <div class="splash-sub">thought &middot; memory</div>
+  <div class="splash-center">
+    <div class="splash-emblem">
+      <svg viewBox="0 0 48 48" width="42" height="42" fill="none" aria-hidden="true">
+        <circle cx="24" cy="24" r="15" fill="rgba(235,203,139,0.12)" stroke="rgba(235,203,139,0.5)" stroke-width="1"/>
+        <g fill="#d8dee9">
+          <path d="M22.5 16 C21.8 15 20.5 14.4 19.2 14.4 C17.9 14.4 16.7 15 15.9 16 C14.4 15.5 12.8 15.7 11.4 16.5 C10.2 17.2 9.3 18.4 9 19.8 C8 22 7.2 24.6 6.6 27.4 C5.9 30.3 5.4 33.2 5 36.2 L9.1 33.5 L9.5 37.1 L12.3 33.6 C13.4 34 14.6 33.8 15.6 33 L15.2 36.4 L17.7 32.7 C18.9 31.4 19.5 29.7 19.4 27.9 C19.3 26.1 18.5 24.4 17.2 23.2 C18.6 22.9 19.8 22.1 20.7 21 C21.3 20.1 21.7 19 21.7 17.9 C22 17.3 22.3 16.7 22.5 16 Z"/>
+          <path d="M22.5 16 C21.8 15 20.5 14.4 19.2 14.4 C17.9 14.4 16.7 15 15.9 16 C14.4 15.5 12.8 15.7 11.4 16.5 C10.2 17.2 9.3 18.4 9 19.8 C8 22 7.2 24.6 6.6 27.4 C5.9 30.3 5.4 33.2 5 36.2 L9.1 33.5 L9.5 37.1 L12.3 33.6 C13.4 34 14.6 33.8 15.6 33 L15.2 36.4 L17.7 32.7 C18.9 31.4 19.5 29.7 19.4 27.9 C19.3 26.1 18.5 24.4 17.2 23.2 C18.6 22.9 19.8 22.1 20.7 21 C21.3 20.1 21.7 19 21.7 17.9 C22 17.3 22.3 16.7 22.5 16 Z" transform="translate(48 0) scale(-1 1)"/>
+        </g>
+      </svg>
+    </div>
+    <div class="splash-brand">Huginn <span class="amp">&amp;</span> Muninn</div>
+    <div class="splash-sub">thought · memory</div>
+  </div>
+  <div class="splash-bar"></div>
 </div>
 
 <div id="app">
@@ -2158,13 +2136,13 @@ route();
 const splash = document.getElementById("splash");
 if (splash) {
   splash.addEventListener("animationend", function handler(e) {
-    if (e.animationName === "splash-fade-out") {
+    if (e.animationName === "splash-exit") {
       splash.classList.add("dismissed");
       splash.removeEventListener("animationend", handler);
     }
   });
-  /* safety net: force dismiss after 3.5s even if animationend doesn't fire */
-  setTimeout(() => { if (splash) splash.classList.add("dismissed"); }, 3500);
+  /* safety net: force dismiss after 1.2s */
+  setTimeout(() => { if (splash) splash.classList.add("dismissed"); }, 1200);
 }
 </script>
 </body>
