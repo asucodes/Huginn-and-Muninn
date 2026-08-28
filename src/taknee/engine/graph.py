@@ -26,7 +26,9 @@ from typing import Any
 
 from .. import patches, tools
 from ..engine.sandbox import GitWorktreeSandbox
+from ..engine.subagent import SubagentDelegator
 from ..index.repo_map import build_repo_map
+from ..memory import MemoryManager
 from ..store import Store
 from ..swarm.cache_optimizer import PromptCachePacker
 from ..swarm.rotator import SwarmRotator
@@ -45,12 +47,15 @@ You are Huginn, an autonomous agent capable of both coding tasks and live data r
 - Prefer minimal, precise changes. Always verify your work before submitting.
 
 ## Tool usage
+- To investigate large code areas or explore subsystems without filling your context window: use `delegate_research`.
+- To remember project conventions, test commands, or architecture patterns for future runs: use `record_memory`.
 - To read a URL or API (live web data, JSON APIs, documentation): use `web_fetch`.
 - To write a brand-new file: use `create_file`.
 - To modify an existing file: use `write_patch`.
 - To explore directory structure: use `list_dir`.
 - To read an existing file: use `read_file`.
 - To search for code patterns: use `search_code`.
+- To run tests: use `run_tests`.
 - When your task is done, call `submit_task` with a concise summary.
 
 ## When the task involves fetching live data and writing a file
@@ -163,6 +168,40 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "delegate_research",
+            "description": (
+                "Delegate a targeted code search or investigation task to an isolated subagent. "
+                "The subagent explores files and returns a concise summary of findings. "
+                "Use this to explore large subsystems without polluting your main conversation context."
+            ),
+            "parameters": {"type": "object", "properties": {
+                "goal": {"type": "string", "description": "Specific question or research task."},
+                "scope_hint": {"type": "string", "description": "Optional directory or file path hint (e.g. 'src/taknee/swarm')."}
+            }, "required": ["goal"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_memory",
+            "description": (
+                "Record a newly discovered project convention, working test/build command, "
+                "architecture rule, or quirk into the project's permanent memory (.taknee/memory.json and AGENTS.md). "
+                "This fact will be automatically remembered across all future tasks."
+            ),
+            "parameters": {"type": "object", "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": ["test", "build", "convention", "architecture", "quirk"],
+                    "description": "Category of the learned fact.",
+                },
+                "fact": {"type": "string", "description": "The exact fact, command, or rule to remember."},
+            }, "required": ["category", "fact"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_tests",
             "description": "Run the project's test suite inside the sandbox. Returns exit code and output.",
             "parameters": {"type": "object", "properties": {
@@ -198,10 +237,12 @@ class MilestoneGraph:
         store: Store,
         project_rules: str = "",
     ):
-        self.workspace = workspace
+        self.workspace = workspace.resolve()
         self.rotator = rotator
         self.store = store
-        self.project_rules = project_rules
+        self.memory = MemoryManager(self.workspace)
+        self.subagents = SubagentDelegator(self.workspace, self.rotator, self._dispatch_tool)
+        self.project_rules = project_rules or self.memory.export_digest()
         self.packer = PromptCachePacker()
 
     def run(self, task_id: str, task_prompt: str, test_cmd: str = "pytest -q") -> MilestoneResult:
@@ -406,10 +447,29 @@ class MilestoneGraph:
             except Exception as e:
                 return f"ERROR fetching {url}: {e}"
 
+        if name == "delegate_research":
+            goal = args.get("goal", "")
+            scope_hint = args.get("scope_hint", "")
+            if not goal:
+                return "ERROR: 'goal' is required"
+            res = self.subagents.run(goal, scope_hint, sandbox)
+            return f"[SUBAGENT FINDINGS ({res.steps_used} steps, ${res.cost_usd:.4f})]:\n{res.findings}"
+
+        if name == "record_memory":
+            cat = args.get("category", "convention")
+            fact = args.get("fact", "")
+            if not fact:
+                return "ERROR: 'fact' is required"
+            saved = self.memory.record_discovery(cat, fact)
+            status = "Recorded new memory" if saved else "Memory already recorded"
+            return f"OK: {status} [{cat}]: {fact}"
+
         if name == "run_tests":
             cmd = args.get("cmd", test_cmd)
             exit_code, output = sandbox.run(cmd, timeout=120.0)
             status = "PASS" if exit_code == 0 else "FAIL"
+            if exit_code == 0:
+                self.memory.record_test_result(cmd, True)
             return f"[{status}] exit={exit_code}\n{output}"
 
         if name == "search_code":

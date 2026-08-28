@@ -27,6 +27,7 @@ from typing import Any, Callable
 
 from . import agents_md, catalog, compaction, patches, providers, research, retrieval, tools
 from .compaction import ContextItem
+from .memory import MemoryManager
 from .router import Router
 from .store import Store
 
@@ -110,6 +111,7 @@ class Orchestrator:
         self.workspace = str(Path(workspace).resolve())
         self.chat_fn = chat_fn
         self.auto_approve = auto_approve
+        self.memory = MemoryManager(Path(self.workspace))
         self.rules = agents_md.load_for_workspace(Path(self.workspace))
         self.index: retrieval.Index | None = None
         self._fingerprints: Counter[str] = Counter()
@@ -280,7 +282,7 @@ class Orchestrator:
         for chunk, _score, _reason in hits:
             self._remember(f"chunk:{chunk.header()}", chunk.text)
         self._remember("repo_map", self.index.repo_map(token_budget=900), pinned=True)
-        digest = self.rules.pinned_digest()
+        digest = self.rules.pinned_digest() or self.memory.export_digest()
         if digest:
             self._remember("AGENTS.md", digest, pinned=True)
         self._remember("task_prompt", prompt, pinned=True)
@@ -551,6 +553,8 @@ class Orchestrator:
             )
             log = (r.stdout or "") + "\n" + (r.stderr or "")
             ok = r.returncode == 0
+            if ok:
+                self.memory.record_test_result(cmd, True)
         except subprocess.TimeoutExpired:
             log, ok = "test command timed out (300s)", False
         self._remember("last_fail_log", log[-3000:], pinned=True)
